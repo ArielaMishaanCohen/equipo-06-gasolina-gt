@@ -1,0 +1,34 @@
+# Datos y fotos (nunca van al repo)
+datos/
+*.jpg
+*.jpeg
+*.JPG
+*.JPEG
+*.heic
+*.HEIC
+*.png
+!src/gasolina/api/static/*.png
+
+# Secretos
+.env
+
+# Generados en ejecución
+artifacts/
+logs/
+api.pid
+mlruns/
+mlruns
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv*/
+.venv*
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+
+# Sistema
+.DS_Store

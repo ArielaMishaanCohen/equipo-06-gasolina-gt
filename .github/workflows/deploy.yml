@@ -1,0 +1,36 @@
+name: deploy
+
+# Solo manual: el servidor está encendido únicamente durante la clase.
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Preparar llave SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+
+      - name: Probar conexión
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          if ! ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 \
+               "$SSH_USER@$SSH_HOST" true; then
+            echo "::error::No se pudo conectar por SSH a $SSH_HOST. ¿El servidor está encendido? ¿Se agregó gha_deploy.pub a ~/.ssh/authorized_keys?"
+            exit 1
+          fi
+
+      - name: Desplegar
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=accept-new "$SSH_USER@$SSH_HOST" \
+            "cd ~/apps/gasolina-mlops && bash scripts/deploy.sh"

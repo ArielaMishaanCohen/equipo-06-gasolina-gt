@@ -1,0 +1,14 @@
+{
+  "origen": "demo",
+  "fecha": "2026-11-10T00:00:00-06:00",
+  "version_champion": "0.0.0-demo",
+  "fecha_reentrenamiento": "2026-11-10T00:00:00-06:00",
+  "error_produccion": {"mae": null},
+  "error_validacion": {"mae": 0.45},
+  "drift_vs_mem_pct": {"diesel": null, "regular": null, "super": null},
+  "alertas": [
+    {"nombre": "pct_score_bajo", "activa": false, "valor": null, "umbral": 30, "mensaje": "Sin datos de producción todavía (artifact demo)."},
+    {"nombre": "drift_vs_mem", "activa": false, "valor": null, "umbral": 10, "mensaje": "Sin datos de producción todavía (artifact demo)."},
+    {"nombre": "mae_produccion_vs_validacion", "activa": false, "valor": null, "umbral": 2.0, "mensaje": "Sin datos de producción todavía (artifact demo)."}
+  ]
+}

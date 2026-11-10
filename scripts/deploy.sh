@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+# Despliegue de la API en el servidor (DigitalOcean).
+# Uso:  bash scripts/deploy.sh [--sin-pull] [--modo docker|venv]
+#   --sin-pull : no hace git pull (lo usa el @reboot del crontab)
+#   --modo     : docker o venv. Si no se indica, usa docker si "docker ps" funciona.
+set -uo pipefail
+
+# --- Ir a la raíz del repo (funciona aunque se llame desde otra carpeta o desde cron) ---
+cd "$(dirname "$0")/.." || exit 1
+REPO="$(pwd)"
+PUERTO="${PUERTO:-8000}"
+
+# --- Leer flags ---
+HACER_PULL=1
+MODO=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --sin-pull) HACER_PULL=0 ;;
+    --modo) shift; MODO="${1:-}" ;;
+    --modo=*) MODO="${1#*=}" ;;
+    *) echo "Opción desconocida: $1"; exit 2 ;;
+  esac
+  shift
+done
+
+paso() { echo; echo "==> $*"; }
+
+# --- Detectar el modo: docker si "docker ps" funciona, si no venv ---
+if [ -z "$MODO" ]; then
+  if docker ps >/dev/null 2>&1; then MODO=docker; else MODO=venv; fi
+fi
+echo "Modo de despliegue: $MODO (repo: $REPO)"
+
+# --- 1. Traer la última versión del código ---
+if [ "$HACER_PULL" = 1 ]; then
+  paso "git pull"
+  git pull --ff-only || echo "AVISO: git pull falló; sigo con el código que ya está."
+fi
+
+# --- 2. Carpetas que la API usa (son volúmenes en Docker) ---
+paso "Creando logs/ y artifacts/"
+mkdir -p logs artifacts
+
+# --- 3. .env: debe existir; agregamos ENTORNO y el UID/GID del usuario si faltan ---
+if [ ! -f .env ]; then
+  echo "AVISO: no existe .env (sin credenciales de Databricks). Creo uno vacío desde .env.example."
+  cp .env.example .env
+fi
+grep -q '^ENTORNO=' .env || echo "ENTORNO=servidor" >> .env
+grep -q '^APP_UID=' .env || echo "APP_UID=$(id -u)" >> .env
+grep -q '^APP_GID=' .env || echo "APP_GID=$(id -g)" >> .env
+chmod 600 .env
+# Cargar .env en este shell (para IMAGEN_DOCKER y el modo venv)
+set -a; . ./.env; set +a
+
+mostrar_log() {
+  if [ "$MODO" = docker ]; then docker compose logs --tail 40 api; else tail -n 40 logs/api.log; fi
+}
+
+esperar_health() {
+  # Espera hasta 90 s a que /health responda y muestra el JSON.
+  paso "Esperando a que /health responda (máx. 90 s)"
+  for _ in $(seq 1 45); do
+    if RESP=$(python3 -c "import urllib.request;print(urllib.request.urlopen('http://localhost:$PUERTO/health',timeout=3).read().decode())" 2>/dev/null); then
+      echo "$RESP" | python3 -m json.tool
+      echo
+      echo "✅ API arriba en http://$(hostname -I 2>/dev/null | awk '{print $1}'):$PUERTO"
+      return 0
+    fi
+    sleep 2
+  done
+  echo "❌ /health no respondió en 90 s. Últimas 40 líneas del log:"
+  mostrar_log
+  exit 1
+}
+
+if [ "$MODO" = docker ]; then
+  # --- 4D. Imagen: descargar de GHCR si IMAGEN_DOCKER está definida; si falla, construir ---
+  CONSTRUIR=0
+  if [ -n "${IMAGEN_DOCKER:-}" ]; then
+    paso "docker compose pull ($IMAGEN_DOCKER)"
+    docker compose pull api || { echo "AVISO: pull falló; construyo la imagen aquí."; CONSTRUIR=1; }
+  else
+    CONSTRUIR=1
+  fi
+  if [ "$CONSTRUIR" = 1 ]; then
+    paso "docker compose build"
+    docker compose build api || { echo "❌ No se pudo construir la imagen."; exit 1; }
+  fi
+
+  # --- 5D. Sincronizar artifacts desde Databricks (dentro del contenedor) ---
+  paso "Sincronizando artifacts desde Databricks"
+  docker compose run --rm --no-deps api gasolina-sync descargar \
+    || echo "AVISO: la sincronización falló; la API usará lo que haya (o artifacts_demo)."
+
+  # --- 6D. Levantar (restart: unless-stopped => se levanta sola al encender el servidor) ---
+  paso "docker compose up -d"
+  docker compose up -d api || { echo "❌ docker compose up falló."; mostrar_log; exit 1; }
+  docker compose ps
+else
+  # --- 4V. Entorno virtual de Python ---
+  export ARTIFACTS_DIR="$REPO/artifacts" LOGS_DIR="$REPO/logs" ENTORNO="${ENTORNO:-servidor}"
+  if [ ! -x .venv/bin/python ]; then
+    paso "Creando .venv"
+    python3 -m venv .venv || { command -v uv >/dev/null && uv venv .venv; } \
+      || { echo "❌ No se pudo crear el venv (¿falta python3-venv?)."; exit 1; }
+  fi
+  paso 'pip install -e ".[api]"'
+  .venv/bin/python -m pip install -q --upgrade pip
+  .venv/bin/python -m pip install -q -e ".[api]" || { echo "❌ pip install falló."; exit 1; }
+
+  # --- 5V. Sincronizar artifacts ---
+  paso "Sincronizando artifacts desde Databricks"
+  .venv/bin/gasolina-sync descargar \
+    || echo "AVISO: la sincronización falló; la API usará lo que haya (o artifacts_demo)."
+
+  # --- 6V. Detener la instancia anterior (api.pid) ---
+  if [ -f api.pid ] && kill -0 "$(cat api.pid)" 2>/dev/null; then
+    paso "Deteniendo la API anterior (PID $(cat api.pid))"
+    kill "$(cat api.pid)"; sleep 2
+    kill -0 "$(cat api.pid)" 2>/dev/null && kill -9 "$(cat api.pid)"
+  fi
+
+  # --- 7V. Arrancar en segundo plano y guardar el PID ---
+  paso "Arrancando gasolina-api con nohup"
+  nohup .venv/bin/gasolina-api > logs/api.log 2>&1 &
+  echo $! > api.pid
+  echo "PID: $(cat api.pid)"
+
+  # --- 8V. @reboot en crontab para que se levante sola al encender el servidor ---
+  LINEA="@reboot cd $REPO && bash scripts/deploy.sh --sin-pull --modo venv >> logs/deploy.log 2>&1"
+  if ! crontab -l 2>/dev/null | grep -qF "deploy.sh --sin-pull"; then
+    paso "Instalando @reboot en crontab"
+    (crontab -l 2>/dev/null; echo "$LINEA") | crontab - && echo "OK: $LINEA"
+  fi
+fi
+
+esperar_health

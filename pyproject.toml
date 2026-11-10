@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gasolina"
+version = "0.1.0"
+description = "Lectura de precios de gasolina desde fotos + pronóstico (Proyecto final ML Engineering, Grupo 6)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pillow",
+    "pillow-heif",
+    "numpy",
+    "pandas",
+    "pyyaml",
+    "rapidocr_onnxruntime==1.3.24",
+    "opencv-python-headless",
+    "pdfplumber",
+    "scikit-learn",
+    "joblib",
+    "requests",
+]
+
+[project.optional-dependencies]
+api = [
+    "fastapi",
+    "uvicorn[standard]",
+    "python-multipart",
+    "databricks-sdk",
+]
+easyocr = ["easyocr"]
+dev = ["pytest", "ruff", "httpx"]
+
+[project.scripts]
+gasolina-extraer = "gasolina.cli:extraer"
+gasolina-evaluar = "gasolina.cli:evaluar"
+gasolina-sync = "gasolina.cli:sync"
+gasolina-api = "gasolina.cli:api"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"gasolina.api" = ["static/*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = ["notebooks"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

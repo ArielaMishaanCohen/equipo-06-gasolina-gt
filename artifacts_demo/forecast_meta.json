@@ -1,0 +1,14 @@
+{
+  "origen": "demo",
+  "fecha": "2026-11-10T00:00:00-06:00",
+  "modelo": "baseline_ingenuo",
+  "version": "0.0.0-demo",
+  "features": ["precio_lag1", "precio_lag2", "precio_lag4", "fred_q_gal_lag1", "fred_q_gal_lag2", "wti_lag1", "subsidio_activo", "subsidio_monto"],
+  "metricas_validacion": {
+    "mae": 0.45,
+    "rmse": 0.62,
+    "mape": 1.2,
+    "mejora_vs_baseline_pct": 0.0
+  },
+  "fecha_entrenamiento": "2026-11-10T00:00:00-06:00"
+}

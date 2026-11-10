@@ -1,0 +1,12 @@
+{
+  "origen": "demo",
+  "fecha": "2026-11-10T00:00:00-06:00",
+  "semana_objetivo": "2026-W47",
+  "modelo": "baseline_ingenuo",
+  "version": "0.0.0-demo",
+  "predicciones": [
+    {"combustible": "diesel", "prediccion": 35.20, "intervalo_inf": 34.40, "intervalo_sup": 36.00},
+    {"combustible": "regular", "prediccion": 36.90, "intervalo_inf": 36.10, "intervalo_sup": 37.70},
+    {"combustible": "super", "prediccion": 37.90, "intervalo_inf": 37.10, "intervalo_sup": 38.70}
+  ]
+}
