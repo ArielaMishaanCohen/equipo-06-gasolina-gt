@@ -43,15 +43,20 @@ def _cliente(aj: Ajustes):
         )
     try:
         from databricks.sdk import WorkspaceClient
+        from databricks.sdk.core import Config
     except ImportError as e:  # pragma: no cover
         raise ErrorSync('Falta databricks-sdk. Instala con: pip install -e ".[api]"') from e
-    return WorkspaceClient(
-        host=aj.databricks_host,
-        token=aj.databricks_token,
-        auth_type="pat",
-        retry_timeout_seconds=45,
-        http_timeout_seconds=30,
-    )
+    try:
+        cfg = Config(
+            host=aj.databricks_host,
+            token=aj.databricks_token,
+            auth_type="pat",
+            retry_timeout_seconds=45,  # sin red: falla en ~45 s en lugar de 5 min
+            http_timeout_seconds=30,
+        )
+    except Exception as e:
+        raise _traducir_error(e, "Configuración de Databricks inválida") from e
+    return WorkspaceClient(config=cfg)
 
 
 def _traducir_error(e: Exception, contexto: str) -> ErrorSync:
