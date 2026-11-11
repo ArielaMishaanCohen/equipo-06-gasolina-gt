@@ -5,16 +5,14 @@ services:
       context: .
       dockerfile: docker/Dockerfile
     # deploy.sh pone APP_UID/APP_GID en .env con el usuario del servidor, para que el
-    # contenedor pueda escribir en ./logs y ./artifacts.
+    # contenedor pueda escribir en ./logs.
     user: "${APP_UID:-1000}:${APP_GID:-1000}"
     ports:
-      - "8000:8000"
+      - "${PUERTO:-8006}:${PUERTO:-8006}"   # puerto 80XX del equipo
     volumes:
-      - ./artifacts:/app/artifacts
       - ./logs:/app/logs
     env_file: .env
     environment:
-      ARTIFACTS_DIR: /app/artifacts
       LOGS_DIR: /app/logs
     # La API se levanta sola cada vez que el profesor enciende el servidor.
     restart: unless-stopped

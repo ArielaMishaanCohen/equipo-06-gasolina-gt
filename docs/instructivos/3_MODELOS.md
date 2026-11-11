@@ -66,14 +66,14 @@ git add -A && git commit -m "modelos: <qué hiciste>" && git push
 
 ### 3.1 ⭐ Conocer las fotos
 
-Las fotos oficiales las sube el catedrático a `s3://cc3105-cusn-…/fotos/AAAA-MM-DD/` y pueden ser **rótulos de gasolineras o tablas de precios de referencia del MEM**, no solo bombas Shell como las 5 nuestras. En cuanto se puedan leer (Datos avisa), descarga unas cuantas para mirarlas:
+Las fotos oficiales están en `s3://cc3105-raw-869227452861-us-east-2-an/img/` (external location `xloc-raw`, solo lectura). Ariela ya las descargó: pídele `datos/fotos_profesor/` (38 `.HEIC`). Lo que ya sabemos:
 
-```python
-# en un notebook de Databricks
-display(dbutils.fs.ls("s3://cc3105-cusn-869227452861-us-east-2-an/fotos/"))
-```
+- Son **38 fotos de bombas**, aproximadamente una por semana, del 7 de enero al 8 de noviembre de 2026, todas con fecha y GPS en el EXIF.
+- Hay **al menos dos marcas**: Puma (pantallitas "ION Diesel", "Regular", "Super") y Shell ("V-Power", "Super", "Regular", "Diesel"), y **el orden de los combustibles cambia entre bombas**. Por eso los precios se asignan por la **etiqueta impresa** más cercana a cada pantallita, nunca solo por la posición.
+- V-Power se lee, pero se descarta (el enunciado solo pide super, regular y diésel).
+- La pantalla "Esta Venta" (total ÷ galones) sirve para verificar uno de los precios: 100.00 ÷ 3.664 = 27.29 = Super en la foto de Puma.
 
-Clasifícalas a ojo por tipo (`rotulo`, `bomba`, `tabla_mem`): eso define la estrategia de extracción.
+Antes de programar, abre las 38 en Vista Previa y anota en `etiquetas.csv` la marca y los 3 precios de cada una: es la revisión manual que pide el enunciado (20+ fotos).
 
 ### 3.2 ⭐ Plantilla de revisión manual
 

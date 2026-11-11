@@ -1,14 +1,11 @@
 """Configuración: config/config.yaml + variables de entorno (dueña: Producción).
 
-Orden de búsqueda de config.yaml:
-  1. Variable de entorno GASOLINA_CONFIG.
-  2. <raíz del repo>/config/config.yaml (instalación editable o corriendo desde el repo).
-  3. ./config/config.yaml (directorio actual; así funciona dentro de Docker, WORKDIR /app).
-Si no se encuentra, se usan valores por defecto (DEFAULTS) para que nada truene.
+Búsqueda de config.yaml: $GASOLINA_CONFIG -> <raíz del repo>/config/config.yaml ->
+./config/config.yaml. Si no existe, se usan DEFAULTS (nada truena).
 
-Variables de entorno (ver .env.example). Si existe un archivo .env en el directorio actual o en
-la raíz del repo, se carga SIN sobrescribir variables ya definidas. Una variable vacía
-(ej. "ARTIFACTS_DIR=") cuenta como no definida.
+Variables de entorno (ver api/.env.example). Si hay un .env en el directorio actual o en la raíz
+del repo, se carga SIN sobrescribir variables ya definidas. Una variable vacía cuenta como no
+definida.
 """
 
 from __future__ import annotations
@@ -21,58 +18,36 @@ from pathlib import Path
 
 import yaml
 
-# src/gasolina/config.py -> parents[2] = raíz del repo
 RAIZ_REPO = Path(__file__).resolve().parents[2]
 
 DEFAULTS: dict = {
+    "equipo": {"numero": 6, "prefijo_s3": "equipo6"},
     "databricks": {
         "catalogo": "workspace",
-        "volumenes": {
-            "crudos": "/Volumes/workspace/g6_bronce/crudos",
-            "artifacts": "/Volumes/workspace/g6_oro/artifacts",
-        },
-        "rutas_bronce": {"api_logs": "/Volumes/workspace/g6_bronce/crudos/api_logs"},
+        "esquemas": {"bronze": "equipo6_bronze", "silver": "equipo6_silver",
+                     "gold": "equipo6_gold"},
     },
-    "combustibles": ["diesel", "regular", "super", "vpower"],
-    "precios": {"rango_valido": {"min": 20.0, "max": 60.0}},
-    "reglas": {
-        "super_menos_regular": 1.00,
-        "vpower_menos_super": 0.50,
-        "tolerancia": 0.05,
-        "tolerancia_ruta_a": 0.02,
-        "tolerancia_mem_pct": 15,
+    "s3": {
+        "gold": "s3://cc3105-au-869227452861-us-east-2-an/equipo6",
+        "region": "us-east-2",
     },
-    "extraccion": {
-        "motor": "rapidocr",
-        "preproc": "gris_clahe",
-        "estrategia": "fusion",
-        "segunda_pasada": False,
-        "umbral_score": 0.7,
+    "tablas": {
+        "gold": ["precio_semanal", "variacion_semanal", "features_modelo", "predicciones",
+                 "metricas_modelo"],
     },
-    "forecast": {"tipo_cambio": 7.7},
-    "api": {
-        "max_mb": 15,
-        "extensiones": [".jpg", ".jpeg", ".png", ".heic", ".heif"],
-        "zona_horaria_utc": -6,
-    },
-    "monitoreo": {
-        "umbrales": {
-            "pct_score_bajo_max": 30,
-            "drift_vs_mem_pct_max": 10,
-            "ratio_mae_prod_vs_validacion_max": 2.0,
-            "latencia_p95_ms_max": 5000,
-        }
-    },
+    "combustibles": ["super", "regular", "diesel"],
+    "calidad": {"rango_precio": {"min": 20.0, "max": 60.0}, "confianza_minima": 0.5},
+    "direccion": {"umbral_q": 0.10, "clases": ["sube", "baja", "se_mantiene"]},
+    "extraccion": {"motor": "rapidocr", "preproc": "gris_clahe"},
+    "api": {"puerto": 8006, "limit_default": 100, "limit_max": 1000, "oro_ttl_segundos": 300,
+            "zona_horaria_utc": -6},
 }
 
 
 def _fusionar(base: dict, extra: dict) -> dict:
     out = copy.deepcopy(base)
     for k, v in (extra or {}).items():
-        if isinstance(v, dict) and isinstance(out.get(k), dict):
-            out[k] = _fusionar(out[k], v)
-        else:
-            out[k] = v
+        out[k] = _fusionar(out[k], v) if isinstance(v, dict) and isinstance(out.get(k), dict) else v
     return out
 
 
@@ -81,25 +56,22 @@ def ruta_config() -> Path | None:
     if os.environ.get("GASOLINA_CONFIG"):
         candidatos.append(Path(os.environ["GASOLINA_CONFIG"]))
     candidatos += [RAIZ_REPO / "config" / "config.yaml", Path.cwd() / "config" / "config.yaml"]
-    for c in candidatos:
-        if c.is_file():
-            return c
-    return None
+    return next((c for c in candidatos if c.is_file()), None)
 
 
 @lru_cache(maxsize=1)
 def cargar_config() -> dict:
-    """Devuelve config.yaml fusionado sobre DEFAULTS (siempre un dict completo)."""
+    """config.yaml fusionado sobre DEFAULTS (siempre un dict completo)."""
     ruta = ruta_config()
-    datos = {}
-    if ruta:
-        with open(ruta, encoding="utf-8") as f:
-            datos = yaml.safe_load(f) or {}
-    return _fusionar(DEFAULTS, datos)
+    datos = yaml.safe_load(ruta.read_text(encoding="utf-8")) if ruta else {}
+    return _fusionar(DEFAULTS, datos or {})
 
 
 def cargar_dotenv() -> None:
-    """Carga .env (si existe) sin sobrescribir variables ya definidas. Sin dependencias."""
+    """Carga .env (si existe) sin sobrescribir variables ya definidas. Sin dependencias.
+    GASOLINA_SIN_DOTENV=1 lo desactiva (lo usan los tests)."""
+    if os.environ.get("GASOLINA_SIN_DOTENV"):
+        return
     for ruta in (Path.cwd() / ".env", RAIZ_REPO / ".env"):
         if not ruta.is_file():
             continue
@@ -115,49 +87,46 @@ def cargar_dotenv() -> None:
         return
 
 
-def _env(nombre: str, default: str | None = None) -> str | None:
+def _env(nombre: str, default=None):
     valor = os.environ.get(nombre)
     return valor if valor not in (None, "") else default
 
 
-def _primera_existente(*rutas: Path) -> Path:
-    for r in rutas:
-        if r.is_dir():
-            return r
-    return rutas[0]
-
-
 @dataclass(frozen=True)
 class Ajustes:
+    # Databricks (sync de logs y plan B de lectura de Oro vía SQL warehouse)
     databricks_host: str | None
     databricks_token: str | None
-    gold_artifacts_path: str
-    bronze_logs_path: str
-    artifacts_dir: Path
-    artifacts_demo_dir: Path
+    databricks_warehouse_id: str | None
+    # Oro en S3 (lectura directa con deltalake y credenciales de solo lectura)
+    oro_s3_prefix: str | None
+    aws_access_key_id: str | None
+    aws_secret_access_key: str | None
+    aws_region: str
+    # Locales
+    oro_demo_dir: Path
     logs_dir: Path
-    imagen_docker: str | None
+    bronze_logs_path: str
     entorno: str
+    puerto: int
 
 
 def ajustes() -> Ajustes:
-    """Lee las variables de entorno (se vuelve a leer en cada llamada, no se cachea)."""
+    """Lee las variables de entorno en cada llamada (no se cachea)."""
     cargar_dotenv()
     cfg = cargar_config()
-    vol = cfg["databricks"]["volumenes"]
     return Ajustes(
         databricks_host=_env("DATABRICKS_HOST"),
         databricks_token=_env("DATABRICKS_TOKEN"),
-        gold_artifacts_path=_env("GOLD_ARTIFACTS_PATH", vol["artifacts"]).rstrip("/"),
-        bronze_logs_path=_env(
-            "BRONZE_LOGS_PATH", cfg["databricks"]["rutas_bronce"]["api_logs"]
-        ).rstrip("/"),
-        artifacts_dir=Path(_env("ARTIFACTS_DIR", "./artifacts")),
-        artifacts_demo_dir=Path(
-            _env("ARTIFACTS_DEMO_DIR")
-            or _primera_existente(RAIZ_REPO / "artifacts_demo", Path.cwd() / "artifacts_demo")
-        ),
+        databricks_warehouse_id=_env("DATABRICKS_WAREHOUSE_ID"),
+        oro_s3_prefix=(_env("ORO_S3_PREFIX") or "").rstrip("/") or None,
+        aws_access_key_id=_env("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=_env("AWS_SECRET_ACCESS_KEY"),
+        aws_region=_env("AWS_REGION", cfg["s3"].get("region", "us-east-2")),
+        oro_demo_dir=Path(_env("ORO_DEMO_DIR") or RAIZ_REPO / "artifacts_demo" / "oro"),
         logs_dir=Path(_env("LOGS_DIR", "./logs")),
-        imagen_docker=_env("IMAGEN_DOCKER"),
+        bronze_logs_path=_env("BRONZE_LOGS_PATH",
+                              "/Volumes/workspace/g6_bronce/crudos/api_logs").rstrip("/"),
         entorno=_env("ENTORNO", "local"),
+        puerto=int(_env("PUERTO", cfg["api"]["puerto"])),
     )

@@ -83,7 +83,8 @@ Los tres buckets ya existen como external locations en el workspace. Por los nom
 
 | External location | Bucket | Capa |
 | --- | --- | --- |
-| `xloc-cusn` | `s3://cc3105-cusn-869227452861-us-east-2-an/` | Bronce (Cu + Sn = bronce) |
+| `xloc-raw` | `s3://cc3105-raw-869227452861-us-east-2-an/img/` | **Fotos del catedrático**. Solo lectura. Al 10 de noviembre: 38 fotos `.HEIC` (3024×4032) de **bombas** (Shell y Puma), una por semana aproximadamente, del 7 de enero al 8 de noviembre de 2026, todas con fecha y GPS en el EXIF; sin subcarpetas de fecha. Copia local en `Proyecto/datos/fotos_profesor/`. |
+| `xloc-cusn` | `s3://cc3105-cusn-869227452861-us-east-2-an/` | Bronce (Cu + Sn = bronce). Ya existe una carpeta `equipo0/`: el prefijo parece ser `equipo<N>/` (confirmar). |
 | `xloc-ag` | `s3://cc3105-ag-869227452861-us-east-2-an/` | Plata (Ag) |
 | `xloc-au` | `s3://cc3105-au-869227452861-us-east-2-an/` | Oro (Au) |
 
@@ -478,6 +479,8 @@ El jurado no conoce el curso. Orden: problema (1–2 min) → arquitectura sin j
 | Problema | Causa probable | Solución |
 | --- | --- | --- |
 | `PERMISSION_DENIED` en `LIST 's3://…'` | Aún sin permisos sobre la external location | Esperar al catedrático; mientras, trabajar con las 5 fotos locales y datos de ejemplo. |
+| `User cannot write to a read-only external location` | La external location está marcada como solo lectura (aunque tenga el grant WRITE FILES) | Solo el catedrático lo cambia (Edit → desmarcar read only). Mientras, crear las tablas como administradas en `workspace` y cambiar a `LOCATION` en S3 después. |
+| Las fotos son `.HEIC` y Pillow no las abre | Falta registrar `pillow_heif` | `pillow_heif.register_heif_opener()` antes de `Image.open` (ya es dependencia del paquete). |
 | `PERMISSION_DENIED` al crear tabla con `LOCATION` | Falta `CREATE EXTERNAL TABLE` en la external location | Pedirlo al catedrático para el prefijo `equipo-06/`. |
 | Auto Loader se queja del checkpoint | Checkpoint fuera del prefijo del equipo | Usar `s3://cc3105-cusn-…/equipo-06/_checkpoints/fotos/`. |
 | `%pip install` falla en el cluster | Ruta del repo mal escrita | Copy path de la carpeta del Git folder. |

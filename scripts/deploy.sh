@@ -8,7 +8,6 @@ set -uo pipefail
 # --- Ir a la raíz del repo (funciona aunque se llame desde otra carpeta o desde cron) ---
 cd "$(dirname "$0")/.." || exit 1
 REPO="$(pwd)"
-PUERTO="${PUERTO:-8000}"
 
 # --- Leer flags ---
 HACER_PULL=1
@@ -38,8 +37,8 @@ if [ "$HACER_PULL" = 1 ]; then
 fi
 
 # --- 2. Carpetas que la API usa (son volúmenes en Docker) ---
-paso "Creando logs/ y artifacts/"
-mkdir -p logs artifacts
+paso "Creando logs/"
+mkdir -p logs
 
 # --- 3. .env: debe existir; agregamos ENTORNO y el UID/GID del usuario si faltan ---
 if [ ! -f .env ]; then
@@ -52,6 +51,7 @@ grep -q '^APP_GID=' .env || echo "APP_GID=$(id -g)" >> .env
 chmod 600 .env
 # Cargar .env en este shell (para IMAGEN_DOCKER y el modo venv)
 set -a; . ./.env; set +a
+PUERTO="${PUERTO:-8006}"   # puerto 80XX del equipo (se define en .env)
 
 mostrar_log() {
   if [ "$MODO" = docker ]; then docker compose logs --tail 40 api; else tail -n 40 logs/api.log; fi
@@ -88,18 +88,13 @@ if [ "$MODO" = docker ]; then
     docker compose build api || { echo "❌ No se pudo construir la imagen."; exit 1; }
   fi
 
-  # --- 5D. Sincronizar artifacts desde Databricks (dentro del contenedor) ---
-  paso "Sincronizando artifacts desde Databricks"
-  docker compose run --rm --no-deps api gasolina-sync descargar \
-    || echo "AVISO: la sincronización falló; la API usará lo que haya (o artifacts_demo)."
-
   # --- 6D. Levantar (restart: unless-stopped => se levanta sola al encender el servidor) ---
   paso "docker compose up -d"
   docker compose up -d api || { echo "❌ docker compose up falló."; mostrar_log; exit 1; }
   docker compose ps
 else
   # --- 4V. Entorno virtual de Python ---
-  export ARTIFACTS_DIR="$REPO/artifacts" LOGS_DIR="$REPO/logs" ENTORNO="${ENTORNO:-servidor}"
+  export LOGS_DIR="$REPO/logs" ENTORNO="${ENTORNO:-servidor}" PUERTO
   export PATH="$HOME/.local/bin:$PATH"
   # Un .venv a medias (sin pip ni uv) se borra y se vuelve a crear.
   if [ -d .venv ] && ! .venv/bin/python -m pip --version >/dev/null 2>&1 \
@@ -120,18 +115,16 @@ else
       touch .venv/.creado_con_uv
     fi
   fi
-  paso 'pip install -e ".[api]"'
-  if [ -f .venv/.creado_con_uv ]; then
+  paso 'Instalando dependencias'
+  if [ -f uv.lock ] && command -v uv >/dev/null; then
+    # Entorno reproducible: versiones exactas de uv.lock (pyproject.toml + uv.lock).
+    uv sync --frozen --extra api || { echo "❌ uv sync falló."; exit 1; }
+  elif [ -f .venv/.creado_con_uv ]; then
     uv pip install -p .venv/bin/python -q -e ".[api]" || { echo "❌ uv pip install falló."; exit 1; }
   else
     .venv/bin/python -m pip install -q --upgrade pip
     .venv/bin/python -m pip install -q -e ".[api]" || { echo "❌ pip install falló."; exit 1; }
   fi
-
-  # --- 5V. Sincronizar artifacts ---
-  paso "Sincronizando artifacts desde Databricks"
-  .venv/bin/gasolina-sync descargar \
-    || echo "AVISO: la sincronización falló; la API usará lo que haya (o artifacts_demo)."
 
   # --- 6V. Detener la instancia anterior (api.pid) ---
   if [ -f api.pid ] && kill -0 "$(cat api.pid)" 2>/dev/null; then

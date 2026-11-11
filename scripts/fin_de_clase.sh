@@ -3,7 +3,8 @@
 # Uso: bash scripts/fin_de_clase.sh
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
-PUERTO="${PUERTO:-8000}"
+[ -f .env ] && PUERTO_ENV=$(grep -E "^PUERTO=" .env | cut -d= -f2)
+PUERTO="${PUERTO:-${PUERTO_ENV:-8006}}"
 
 if docker compose ps --status running api 2>/dev/null | grep -q api; then MODO=docker; else MODO=venv; fi
 echo "Modo: $MODO"
@@ -17,14 +18,14 @@ else
 fi
 
 echo; echo "==> Estado de la API"
-python3 -c "import urllib.request,json;h=json.load(urllib.request.urlopen('http://localhost:$PUERTO/health',timeout=5));print(f\"status={h['status']} version={h['version']} artifacts={h['origen_artifacts']} modo={h['modo_extraccion']}\")" \
+python3 -c "import urllib.request,json;h=json.load(urllib.request.urlopen('http://localhost:$PUERTO/health',timeout=5));print(f\"status={h['status']} version={h['version']} fuente_oro={h['fuente_oro']}\")" \
   || echo "❌ La API no responde en el puerto $PUERTO"
 [ "$MODO" = docker ] && docker compose ps
 
 HOY=$(TZ=America/Guatemala date +%Y%m%d)
-ARCHIVO="logs/predicciones_$HOY.jsonl"
+ARCHIVO="logs/consultas_$HOY.jsonl"
 N=0; [ -f "$ARCHIVO" ] && N=$(wc -l < "$ARCHIVO" | tr -d ' ')
-echo; echo "==> Peticiones a /extraer hoy ($HOY): $N"
+echo; echo "==> Consultas a la API hoy ($HOY): $N"
 
 echo
 echo "Recordatorio: NO hace falta apagar nada. La API se levanta sola cuando el profesor"

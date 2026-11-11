@@ -1,12 +1,15 @@
-"""Punto de entrada de la extracción de precios (dueño: Modelos).
+"""Extracción de precios de una foto (dueño: Modelos).
 
-ESTADO: STUB. Devuelve un dict con TODAS las claves del contrato 4.1
-(docs/INSTRUCTIVO_GENERAL.md), los precios en None y "modo": "stub".
+ESTADO: STUB. Devuelve un dict con TODAS las claves del contrato 5.2
+(docs/instructivos/INSTRUCTIVO_GENERAL.md) y "registros" vacío, con "modo": "stub".
 
-La API (src/gasolina/api/app.py) y el notebook 02_plata consumen esta función:
+Lo consume pipelines/02_silver.py (una fila de silver.precios por registro).
   - NO cambiar el nombre ni quitar claves del resultado.
-  - Cuando el OCR real esté listo, cambiar MODO_EXTRACCION a "real" y devolver "modo": "real".
-    /health reporta MODO_EXTRACCION.
+  - Cuando el OCR real esté listo, cambiar MODO_EXTRACCION a "real".
+
+Lo que sabemos de las fotos (ver la guía de Modelos, sección 3.1): bombas Shell y Puma, el orden
+de los combustibles cambia entre bombas, así que cada precio se asigna por la etiqueta impresa
+("Diesel", "Regular", "Super") y no por la posición. V-Power se descarta.
 """
 
 from __future__ import annotations
@@ -19,25 +22,32 @@ from gasolina.metadata import leer_metadata
 
 MODO_EXTRACCION = "stub"
 
-COMBUSTIBLES = ("diesel", "regular", "super", "vpower")
+COMBUSTIBLES = ("super", "regular", "diesel")
+MODALIDADES = ("autoservicio", "servicio_completo", None)
+TIPOS_FOTO = ("rotulo", "bomba", "tabla_mem", "desconocido")
 
 CLAVES_RESULTADO = (
     "archivo",
     "modo",
     "metadata",
-    "ruta_a",
-    "precios",
-    "fuentes",
-    "combustible_despachado",
+    "registros",
+    "tipo_foto",
     "validaciones",
     "score_confianza",
-    "estrategia",
     "motor",
     "preproc",
-    "segunda_pasada",
     "tiempo_ms",
     "version_modelo",
     "detecciones_crudas",
+)
+
+CLAVES_REGISTRO = (
+    "combustible",
+    "precio_q_galon",
+    "modalidad",
+    "ubicacion",
+    "confianza",
+    "texto_fuente",
 )
 
 
@@ -45,34 +55,27 @@ def extraer_precios(
     ruta: str | Path,
     motor: str = "rapidocr",
     preproc: str = "gris_clahe",
-    estrategia: str = "fusion",
-    referencia: dict | None = None,
-    segunda_pasada: bool = False,
+    fecha_carpeta: str | None = None,
 ) -> dict:
-    """Lee los 4 precios de una foto de bomba.
+    """Lee los precios de una foto (HEIC, JPG o PNG).
 
     Args:
-        ruta: ruta a la imagen (JPG, PNG o HEIC).
+        ruta: ruta a la imagen.
         motor: "rapidocr" | "easyocr".
         preproc: "ninguno" | "gris_clahe" | "gris_clahe_x2" | "binarizado".
-        estrategia: "solo_A" | "solo_B" | "fusion".
-        referencia: precios de referencia MEM {"diesel", "regular", "super", ...} (opcional).
-        segunda_pasada: OCR extra sobre la franja de pantallitas ampliada.
+        fecha_carpeta: fecha de respaldo (AAAA-MM-DD) si la foto no trae EXIF.
 
     Returns:
-        dict del contrato 4.1. STUB: precios en None, "modo": "stub".
+        dict del contrato 5.2. STUB: "registros" vacío y "modo": "stub".
     """
     t0 = time.perf_counter()
     ruta = Path(ruta)
-    metadata = leer_metadata(ruta)
     return {
         "archivo": ruta.name,
         "modo": MODO_EXTRACCION,
-        "metadata": metadata,
-        "ruta_a": {"total": None, "galones": None, "precio_a": None},
-        "precios": dict.fromkeys(COMBUSTIBLES),
-        "fuentes": dict.fromkeys(COMBUSTIBLES),
-        "combustible_despachado": None,
+        "metadata": leer_metadata(ruta),
+        "registros": [],
+        "tipo_foto": "desconocido",
         "validaciones": [
             {
                 "nombre": "ocr_disponible",
@@ -81,10 +84,8 @@ def extraer_precios(
             }
         ],
         "score_confianza": 0.0,
-        "estrategia": estrategia,
         "motor": motor,
         "preproc": preproc,
-        "segunda_pasada": segunda_pasada,
         "tiempo_ms": round((time.perf_counter() - t0) * 1000),
         "version_modelo": __version__,
         "detecciones_crudas": [],

@@ -1,9 +1,9 @@
 """Entrypoints de línea de comandos.
 
-  gasolina-extraer RUTA [--motor] [--preproc] [--estrategia]   (Modelos)
+  gasolina-extraer RUTA [--motor] [--preproc]                  (Modelos)
   gasolina-evaluar [--etiquetas] [--imagenes]                  (Modelos; STUB)
-  gasolina-sync {descargar,subir-logs}                         (Producción)
-  gasolina-api [--host] [--port]                               (Producción)
+  gasolina-sync subir-logs                                     (Producción)
+  gasolina-api [--host] [--port]                               (Producción; puerto de PUERTO)
 """
 
 from __future__ import annotations
@@ -33,19 +33,11 @@ def extraer(argv: list[str] | None = None) -> None:
     p.add_argument("ruta", type=Path, help="imagen o carpeta con imágenes")
     p.add_argument("--motor", default="rapidocr")
     p.add_argument("--preproc", default="gris_clahe")
-    p.add_argument("--estrategia", default="fusion", choices=["solo_A", "solo_B", "fusion"])
-    p.add_argument("--segunda-pasada", action="store_true")
     a = p.parse_args(argv)
     if not a.ruta.exists():
         p.error(f"No existe: {a.ruta}")
     resultados = [
-        extraer_precios(
-            img,
-            motor=a.motor,
-            preproc=a.preproc,
-            estrategia=a.estrategia,
-            segunda_pasada=a.segunda_pasada,
-        )
+        extraer_precios(img, motor=a.motor, preproc=a.preproc)
         for img in _imagenes(a.ruta)
     ]
     salida = resultados[0] if a.ruta.is_file() else resultados
@@ -59,7 +51,6 @@ def evaluar(argv: list[str] | None = None) -> None:
     p.add_argument("--imagenes", type=Path, default=Path("../datos"))
     p.add_argument("--motor", default="rapidocr")
     p.add_argument("--preproc", default="gris_clahe")
-    p.add_argument("--estrategia", default="fusion")
     a = p.parse_args(argv)
     filas = None
     if a.etiquetas.is_file():
@@ -77,11 +68,10 @@ def evaluar(argv: list[str] | None = None) -> None:
                 "imagenes": [p.name for p in _imagenes(a.imagenes)] if a.imagenes.exists() else [],
                 "motor": a.motor,
                 "preproc": a.preproc,
-                "estrategia": a.estrategia,
                 "metricas": {
-                    "accuracy_precio": None,
-                    "mae": None,
-                    "pct_fotos_4_correctos": None,
+                    "pct_precios_correctos": None,
+                    "pct_fotos_completas": None,
+                    "falsos_positivos": None,
                     "tiempo_ms_promedio": None,
                 },
             },
@@ -99,7 +89,6 @@ def sync(argv: list[str] | None = None) -> None:
 
     p = argparse.ArgumentParser(prog="gasolina-sync", description="Sincroniza con Databricks.")
     sub = p.add_subparsers(dest="accion", required=True)
-    sub.add_parser("descargar", help="artifacts de oro -> ARTIFACTS_DIR")
     sub.add_parser("subir-logs", help="logs/*.jsonl -> bronce (api_logs)")
     a = p.parse_args(argv)
     sys.exit(_sync.main(a.accion))
@@ -108,9 +97,11 @@ def sync(argv: list[str] | None = None) -> None:
 def api(argv: list[str] | None = None) -> None:
     import uvicorn
 
+    from gasolina.config import ajustes
+
     p = argparse.ArgumentParser(prog="gasolina-api", description="Levanta la API (FastAPI).")
     p.add_argument("--host", default=os.environ.get("HOST", "0.0.0.0"))
-    p.add_argument("--port", type=int, default=int(os.environ.get("PORT", "8000")))
+    p.add_argument("--port", type=int, default=ajustes().puerto)
     a = p.parse_args(argv)
     uvicorn.run("gasolina.api.app:app", host=a.host, port=a.port, log_level="info")
 

@@ -1,6 +1,5 @@
 """Sincronización con Databricks (dueña: Producción).
 
-  descargar  : GOLD_ARTIFACTS_PATH (volumen de oro) -> ARTIFACTS_DIR (+ manifest.json)
   subir-logs : LOGS_DIR/*.jsonl -> BRONZE_LOGS_PATH (registro en LOGS_DIR/.subidos.json)
 
 Credenciales: DATABRICKS_HOST y DATABRICKS_TOKEN (variables de entorno o .env).
@@ -16,10 +15,8 @@ from __future__ import annotations
 
 import io
 import json
-import os
 import socket
 import sys
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -100,63 +97,6 @@ def _traducir_error(e: Exception, contexto: str) -> ErrorSync:
     return ErrorSync(f"{contexto}: error inesperado {nombre}: {texto[:300]}")
 
 
-# --------------------------------------------------------------------------- descargar
-
-
-def _listar_recursivo(w, ruta: str):
-    for entrada in w.files.list_directory_contents(ruta):
-        if entrada.is_directory:
-            yield from _listar_recursivo(w, entrada.path.rstrip("/"))
-        else:
-            yield entrada
-
-
-def descargar(aj: Ajustes | None = None) -> dict:
-    """Descarga todos los archivos del volumen de artifacts a ARTIFACTS_DIR."""
-    aj = aj or ajustes()
-    w = _cliente(aj)
-    origen = aj.gold_artifacts_path
-    destino = aj.artifacts_dir
-    destino.mkdir(parents=True, exist_ok=True)
-    print(f"Descargando {origen} -> {destino.resolve()}")
-
-    try:
-        entradas = list(_listar_recursivo(w, origen))
-    except Exception as e:
-        raise _traducir_error(e, f"No se pudo listar {origen}") from e
-    if not entradas:
-        print("AVISO: el volumen de artifacts está vacío; la API seguirá con artifacts_demo.")
-
-    archivos = []
-    for ent in entradas:
-        relativo = ent.path[len(origen):].lstrip("/")
-        local = destino / relativo
-        local.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            resp = w.files.download(ent.path)
-            # Se escribe a un temporal y luego se renombra: la API nunca lee un JSON a medias.
-            with tempfile.NamedTemporaryFile(dir=local.parent, delete=False) as tmp:
-                contenido = resp.contents
-                while chunk := contenido.read(1 << 20):
-                    tmp.write(chunk)
-            os.replace(tmp.name, local)
-        except Exception as e:
-            raise _traducir_error(e, f"No se pudo descargar {ent.path}") from e
-        tam = local.stat().st_size
-        archivos.append({"archivo": relativo, "bytes": tam})
-        print(f"  ✓ {relativo} ({tam} bytes)")
-
-    manifest = {
-        "fecha": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
-        "origen": origen,
-        "host": aj.databricks_host,
-        "archivos": archivos,
-    }
-    (destino / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False))
-    print(f"Listo: {len(archivos)} archivo(s). manifest.json actualizado.")
-    return manifest
-
-
 # --------------------------------------------------------------------------- subir-logs
 
 
@@ -225,9 +165,7 @@ def subir_logs(aj: Ajustes | None = None) -> list[str]:
 
 def main(accion: str) -> int:
     try:
-        if accion == "descargar":
-            descargar()
-        elif accion == "subir-logs":
+        if accion == "subir-logs":
             subir_logs()
         else:
             print(f"Acción desconocida: {accion}", file=sys.stderr)

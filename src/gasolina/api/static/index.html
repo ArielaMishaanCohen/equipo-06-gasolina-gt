@@ -3,163 +3,198 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Precios de gasolina — Grupo 6</title>
+  <title>Precio de la gasolina — Equipo 6</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <style>
     :root {
-      --fondo: #f5f6f8; --tarjeta: #ffffff; --texto: #1d2430; --suave: #5b6575;
-      --borde: #dde1e7; --acento: #c8102e; --ok: #1f8a4c; --aviso: #b7791f; --codigo: #f0f2f5;
+      --fondo: #f4f5f7; --tarjeta: #ffffff; --texto: #1c2330; --suave: #5d6777; --borde: #dfe3e8;
+      --acento: #b5121b; --sube: #c0392b; --baja: #1e8449; --igual: #7f8c8d; --aviso: #b7791f;
+      --super: #c0392b; --regular: #d4a017; --diesel: #2c3e50;
     }
     @media (prefers-color-scheme: dark) {
-      :root {
-        --fondo: #12161c; --tarjeta: #1b2028; --texto: #e6e9ee; --suave: #9aa4b2;
-        --borde: #2c333e; --acento: #ff5a6e; --ok: #4cc28a; --aviso: #e0b04f; --codigo: #232a34;
+      :root:not([data-theme="light"]) {
+        --fondo: #11151b; --tarjeta: #1a1f27; --texto: #e7eaef; --suave: #9aa4b2; --borde: #2b323d;
+        --acento: #ff5a64; --sube: #ff6b5e; --baja: #4cd38a; --igual: #a4b0be; --aviso: #e6b450;
+        --super: #ff6b5e; --regular: #f4c430; --diesel: #8fb3d9;
       }
     }
     * { box-sizing: border-box; }
     body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-           background: var(--fondo); color: var(--texto); line-height: 1.5; }
-    header { padding: 20px 16px; border-bottom: 3px solid var(--acento); background: var(--tarjeta); }
-    header h1 { margin: 0; font-size: 1.4rem; }
-    header p { margin: 4px 0 0; color: var(--suave); }
-    main { max-width: 960px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
-    section { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 10px; padding: 16px; }
-    h2 { margin: 0 0 12px; font-size: 1.1rem; }
-    .fila { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
-    button { background: var(--acento); color: #fff; border: 0; border-radius: 6px;
-             padding: 8px 16px; font-size: 1rem; cursor: pointer; }
-    button:disabled { opacity: .5; cursor: wait; }
-    input[type=file] { max-width: 100%; }
-    img#vista { max-width: 100%; max-height: 260px; border-radius: 8px; display: none; margin-top: 12px; }
-    pre { background: var(--codigo); padding: 12px; border-radius: 8px; overflow: auto;
-          max-height: 420px; font-size: .85rem; margin: 12px 0 0; }
-    .precios { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 12px; }
-    .precio { border: 1px solid var(--borde); border-radius: 8px; padding: 10px; text-align: center; }
-    .precio b { display: block; font-size: 1.5rem; }
-    .precio span { color: var(--suave); font-size: .85rem; }
-    .chip { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: .85rem;
-            border: 1px solid var(--borde); }
-    .chip.ok { color: var(--ok); border-color: var(--ok); }
+           background: var(--fondo); color: var(--texto); line-height: 1.45; }
+    header { background: var(--tarjeta); border-bottom: 3px solid var(--acento); padding: 18px 16px; }
+    header h1 { margin: 0; font-size: 1.35rem; }
+    header p { margin: 4px 0 0; color: var(--suave); font-size: .95rem; }
+    main { max-width: 980px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
+    section { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 12px; padding: 16px; }
+    h2 { font-size: 1.05rem; margin: 0 0 12px; }
+    .grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+    .card { border: 1px solid var(--borde); border-radius: 10px; padding: 12px; border-top: 4px solid var(--c, var(--borde)); }
+    .card .nombre { color: var(--suave); font-size: .9rem; }
+    .card .precio { font-size: 1.7rem; font-weight: 700; }
+    .card .detalle { color: var(--suave); font-size: .85rem; }
+    .flecha { font-size: 1.6rem; font-weight: 700; }
+    .sube { color: var(--sube); } .baja { color: var(--baja); } .se_mantiene { color: var(--igual); }
+    .chip { display: inline-block; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--borde); font-size: .82rem; margin: 2px 4px 2px 0; }
+    .chip.ok { color: var(--baja); border-color: var(--baja); }
     .chip.aviso { color: var(--aviso); border-color: var(--aviso); }
-    .chip.mal { color: var(--acento); border-color: var(--acento); }
-    footer { text-align: center; color: var(--suave); font-size: .85rem; padding: 16px; }
+    .chip.mal { color: var(--sube); border-color: var(--sube); }
+    .aviso-demo { display: none; background: color-mix(in srgb, var(--aviso) 15%, transparent);
+                  border: 1px solid var(--aviso); border-radius: 10px; padding: 10px 12px; }
+    .filtros { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+    .filtros button { background: transparent; color: var(--texto); border: 1px solid var(--borde);
+                      border-radius: 999px; padding: 4px 12px; cursor: pointer; font-size: .9rem; }
+    .filtros button.activo { background: var(--acento); color: #fff; border-color: var(--acento); }
+    .grafica { position: relative; height: 280px; }
+    table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+    td, th { padding: 6px 4px; border-bottom: 1px solid var(--borde); text-align: left; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .vacio { color: var(--suave); }
+    footer { text-align: center; color: var(--suave); font-size: .85rem; padding: 8px 16px 24px; }
+    a { color: var(--acento); }
   </style>
 </head>
 <body>
   <header>
-    <h1>⛽ Lectura de precios de gasolina</h1>
-    <p>Sube una foto de la bomba y la API devuelve los precios. Proyecto final de ML Engineering — Grupo 6.</p>
+    <h1>⛽ ¿Sube o baja la gasolina la próxima semana?</h1>
+    <p>Precios leídos de fotos de bombas en Guatemala y predicción semanal (martes a lunes). Equipo 6 · CC3105.</p>
   </header>
 
   <main>
+    <div class="aviso-demo" id="avisoDemo">⚠️ Mostrando <b>datos de ejemplo</b>: la API todavía no está conectada a la capa Oro real.</div>
+
     <section>
-      <h2>Estado de la API</h2>
-      <div class="fila" id="estado"><span class="chip">Consultando…</span></div>
-      <details><summary>Ver respuesta completa de /health</summary><pre id="health">…</pre></details>
+      <h2>Precio actual por galón <span class="vacio" id="semanaActual"></span></h2>
+      <div class="grid3" id="actual"><p class="vacio">Cargando…</p></div>
     </section>
 
     <section>
-      <h2>Leer una foto</h2>
-      <div class="fila">
-        <input type="file" id="foto" accept="image/jpeg,image/png,image/heic,image/heif,.heic,.heif">
-        <label><input type="checkbox" id="debug"> Incluir detecciones crudas</label>
-        <button id="enviar" disabled>Extraer precios</button>
-      </div>
-      <img id="vista" alt="Vista previa de la foto">
-      <div class="precios" id="precios"></div>
-      <pre id="resultado" hidden></pre>
+      <h2>Predicción para la semana del <span id="semanaPred">…</span></h2>
+      <div class="grid3" id="prediccion"><p class="vacio">Cargando…</p></div>
     </section>
 
     <section>
-      <h2>Pronóstico de la próxima semana</h2>
-      <div class="precios" id="pronostico"></div>
+      <h2>Histórico semanal</h2>
+      <div class="filtros" id="filtros"></div>
+      <div class="grafica"><canvas id="grafica"></canvas></div>
+    </section>
+
+    <section>
+      <h2>¿Qué tan bueno es el modelo?</h2>
+      <div id="metricas"><p class="vacio">Cargando…</p></div>
+    </section>
+
+    <section>
+      <h2>Estado del servicio</h2>
+      <div id="estado"><span class="chip">Consultando…</span></div>
+      <p class="vacio" style="margin:8px 0 0">Documentación interactiva: <a href="/docs">/docs</a></p>
     </section>
   </main>
 
-  <footer>Versión preliminar: la interfaz completa (pronóstico, monitoreo y más) llega después.</footer>
+  <footer>Arquitectura: fotos → S3 (Bronce, Plata, Oro) → Databricks → esta API en DigitalOcean.</footer>
 
   <script>
     const $ = (id) => document.getElementById(id);
-    const NOMBRES = { diesel: "Diesel", regular: "Regular", super: "Super", vpower: "V-Power" };
-    const q = (v) => (v === null || v === undefined) ? "—" : "Q " + Number(v).toFixed(2);
+    const NOMBRES = { super: "Super", regular: "Regular", diesel: "Diésel" };
+    const COLOR = (c) => getComputedStyle(document.documentElement).getPropertyValue("--" + c).trim();
+    const FLECHA = { sube: "▲ Sube", baja: "▼ Baja", se_mantiene: "■ Se mantiene" };
+    const q = (v) => v == null ? "—" : "Q " + Number(v).toFixed(2);
+    const pct = (v) => v == null ? "—" : Math.round(v * 100) + " %";
     const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+    const fechaLarga = (iso) => iso ? new Date(iso + "T12:00:00").toLocaleDateString("es-GT", { day: "numeric", month: "long", year: "numeric" }) : "—";
 
-    async function cargarHealth() {
+    async function api(ruta) {
+      const r = await fetch(ruta);
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.status);
+      return r.json();
+    }
+
+    async function cargarActual() {
       try {
-        const r = await fetch("/health");
-        const h = await r.json();
-        $("health").textContent = JSON.stringify(h, null, 2);
-        const origen = h.origen_artifacts === "databricks" ? "ok" : "aviso";
-        const modo = h.modo_extraccion === "real" ? "ok" : "aviso";
+        const j = await api("/precios/actual");
+        $("semanaActual").textContent = "· semana del " + fechaLarga(j.semana_inicio);
+        $("actual").innerHTML = j.precios.map((p) => `
+          <div class="card" style="--c:${COLOR(p.combustible)}">
+            <div class="nombre">${esc(NOMBRES[p.combustible] || p.combustible)}</div>
+            <div class="precio">${q(p.precio_promedio)}</div>
+            <div class="detalle">mín. ${q(p.precio_min)} · máx. ${q(p.precio_max)}</div>
+          </div>`).join("");
+      } catch (e) { $("actual").innerHTML = `<p class="vacio">Todavía no hay precios disponibles.</p>`; }
+    }
+
+    async function cargarPrediccion() {
+      try {
+        const j = await api("/prediccion");
+        $("semanaPred").textContent = fechaLarga(j.semana);
+        $("prediccion").innerHTML = j.predicciones.map((p) => `
+          <div class="card" style="--c:${COLOR(p.combustible)}">
+            <div class="nombre">${esc(NOMBRES[p.combustible] || p.combustible)}</div>
+            <div class="flecha ${esc(p.prediccion)}">${FLECHA[p.prediccion] || esc(p.prediccion)}</div>
+            <div class="detalle">Probabilidad: ${pct(p.probabilidad)}</div>
+            <div class="detalle">Línea base: ${FLECHA[p.prediccion_baseline] || esc(p.prediccion_baseline)}</div>
+          </div>`).join("");
+      } catch (e) { $("prediccion").innerHTML = `<p class="vacio">Todavía no hay predicción disponible.</p>`; $("semanaPred").textContent = "—"; }
+    }
+
+    let grafica, datosHistorico = [], filtro = "todos";
+    function pintarGrafica() {
+      const combustibles = filtro === "todos" ? Object.keys(NOMBRES) : [filtro];
+      const semanas = [...new Set(datosHistorico.map((d) => d.semana_inicio))].sort();
+      const series = combustibles.map((c) => ({
+        label: NOMBRES[c], borderColor: COLOR(c), backgroundColor: COLOR(c), tension: .25, pointRadius: 2,
+        data: semanas.map((s) => (datosHistorico.find((d) => d.semana_inicio === s && d.combustible === c) || {}).precio_promedio ?? null),
+      }));
+      grafica?.destroy();
+      grafica = new Chart($("grafica"), {
+        type: "line", data: { labels: semanas, datasets: series },
+        options: { maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
+          scales: { y: { title: { display: true, text: "Q / galón" } } },
+          plugins: { tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${q(c.parsed.y)}` } } } },
+      });
+    }
+    async function cargarHistorico() {
+      $("filtros").innerHTML = ["todos", ...Object.keys(NOMBRES)].map((c) =>
+        `<button data-c="${c}" class="${c === filtro ? "activo" : ""}">${c === "todos" ? "Todos" : NOMBRES[c]}</button>`).join("");
+      $("filtros").onclick = (e) => {
+        if (!e.target.dataset.c) return;
+        filtro = e.target.dataset.c;
+        [...$("filtros").children].forEach((b) => b.classList.toggle("activo", b.dataset.c === filtro));
+        pintarGrafica();
+      };
+      try {
+        datosHistorico = (await api("/precios?limit=1000")).datos;
+        if (window.Chart) pintarGrafica();
+        else $("grafica").parentElement.innerHTML = `<p class="vacio">No se pudo cargar la librería de gráficas.</p>`;
+      } catch (e) { $("grafica").parentElement.innerHTML = `<p class="vacio">Todavía no hay histórico disponible.</p>`; }
+    }
+
+    async function cargarMetricas() {
+      try {
+        const m = await api("/modelo/metricas");
+        $("metricas").innerHTML = `
+          <table>
+            <tr><th></th><th class="num">Exactitud</th><th class="num">F1 macro</th></tr>
+            <tr><td>Modelo (${esc(m.modelo)})</td><td class="num">${pct(m.accuracy_modelo)}</td><td class="num">${pct(m.f1_macro_modelo)}</td></tr>
+            <tr><td>Línea base ("se repite la dirección")</td><td class="num">${pct(m.accuracy_baseline)}</td><td class="num">${pct(m.f1_macro_baseline)}</td></tr>
+          </table>
+          <p class="vacio" style="margin:8px 0 0">Evaluado con las últimas ${esc(m.n_semanas_test)} semanas (validación temporal).
+          ${m.supera_baseline ? "El modelo <b>supera</b> a la línea base." : "El modelo <b>no supera</b> a la línea base."}</p>`;
+      } catch (e) { $("metricas").innerHTML = `<p class="vacio">Todavía no hay métricas del modelo.</p>`; }
+    }
+
+    async function cargarEstado() {
+      try {
+        const h = await api("/health");
+        $("avisoDemo").style.display = h.fuente_oro === "demo" ? "block" : "none";
+        const fuente = h.fuente_oro === "s3" ? "ok" : (h.fuente_oro === "demo" ? "aviso" : "");
         $("estado").innerHTML =
           `<span class="chip ok">API ${esc(h.status)} · v${esc(h.version)}</span>` +
-          `<span class="chip ${origen}">Artifacts: ${esc(h.origen_artifacts)}</span>` +
-          `<span class="chip ${modo}">Extracción: ${esc(h.modo_extraccion)}</span>` +
+          `<span class="chip ${fuente}">Capa Oro: ${esc(h.fuente_oro)}</span>` +
           `<span class="chip">Entorno: ${esc(h.entorno)}</span>` +
-          `<span class="chip">Hora del servidor: ${esc(h.hora_servidor)}</span>`;
-      } catch (e) {
-        $("estado").innerHTML = `<span class="chip mal">La API no responde</span>`;
-      }
+          `<span class="chip">Hora: ${esc((h.hora_servidor || "").replace("T", " ").slice(0, 16))}</span>`;
+      } catch (e) { $("estado").innerHTML = `<span class="chip mal">La API no responde</span>`; }
     }
 
-    async function cargarPronostico() {
-      try {
-        const p = await (await fetch("/pronostico")).json();
-        if (!p.disponible || !p.predicciones.length) {
-          $("pronostico").innerHTML = "<p>Todavía no hay pronóstico disponible.</p>";
-          return;
-        }
-        $("pronostico").innerHTML = p.predicciones.map((x) => `
-          <div class="precio"><span>${esc(NOMBRES[x.combustible] || x.combustible)}</span>
-          <b>${q(x.prediccion)}</b>
-          <span>${q(x.intervalo_inf)} – ${q(x.intervalo_sup)}</span></div>`).join("") +
-          `<p style="grid-column:1/-1;color:var(--suave);margin:0">Semana ${esc(p.semana_objetivo)} · modelo ${esc(p.modelo)} · origen ${esc(p.origen)}</p>`;
-      } catch (e) {
-        $("pronostico").innerHTML = "<p>No se pudo cargar el pronóstico.</p>";
-      }
-    }
-
-    $("foto").addEventListener("change", () => {
-      const f = $("foto").files[0];
-      $("enviar").disabled = !f;
-      if (f && f.type && f.type !== "image/heic") {
-        $("vista").src = URL.createObjectURL(f);
-        $("vista").style.display = "block";
-      } else {
-        $("vista").style.display = "none";
-      }
-    });
-
-    $("enviar").addEventListener("click", async () => {
-      const f = $("foto").files[0];
-      if (!f) return;
-      const datos = new FormData();
-      datos.append("foto", f);
-      $("enviar").disabled = true;
-      $("enviar").textContent = "Leyendo…";
-      $("resultado").hidden = false;
-      $("resultado").textContent = "Procesando…";
-      $("precios").innerHTML = "";
-      try {
-        const r = await fetch("/extraer" + ($("debug").checked ? "?debug=true" : ""), { method: "POST", body: datos });
-        const j = await r.json();
-        $("resultado").textContent = JSON.stringify(j, null, 2);
-        if (r.ok && j.precios) {
-          $("precios").innerHTML = Object.keys(NOMBRES).map((k) => `
-            <div class="precio"><span>${NOMBRES[k]}</span><b>${q(j.precios[k])}</b>
-            <span>${esc((j.fuentes || {})[k] || "sin lectura")}</span></div>`).join("") +
-            `<p style="grid-column:1/-1;margin:0">Confianza: <b>${esc(j.score_confianza)}</b> · modo <b>${esc(j.modo)}</b> · ${esc(j.tiempo_ms)} ms</p>`;
-        }
-      } catch (e) {
-        $("resultado").textContent = "Error: " + e;
-      } finally {
-        $("enviar").disabled = false;
-        $("enviar").textContent = "Extraer precios";
-        cargarHealth();
-      }
-    });
-
-    cargarHealth();
-    cargarPronostico();
+    cargarEstado(); cargarActual(); cargarPrediccion(); cargarHistorico(); cargarMetricas();
   </script>
 </body>
 </html>

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gasolina"
-version = "0.1.0"
-description = "Lectura de precios de gasolina desde fotos + pronóstico (Proyecto final ML Engineering, Grupo 6)"
+version = "0.2.0"
+description = "Predicción del precio de la gasolina en Guatemala: fotos -> S3 -> Databricks (medallón) -> API (Equipo 6, CC3105)"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -28,6 +28,8 @@ api = [
     "uvicorn[standard]",
     "python-multipart",
     "databricks-sdk",
+    "deltalake>=0.20",
+    "pyarrow>=14,<18",
 ]
 easyocr = ["easyocr"]
 dev = ["pytest", "ruff", "httpx"]
@@ -47,7 +49,7 @@ where = ["src"]
 [tool.ruff]
 line-length = 100
 target-version = "py310"
-extend-exclude = ["notebooks"]
+extend-exclude = ["pipelines"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]

@@ -1,85 +1,53 @@
-# Configuración central del proyecto (dueña: Producción).
-# Si el catálogo real no es "workspace", se cambia SOLO aquí (y en los widgets de los notebooks).
+# Configuración central del proyecto (dueña: Producción). Equipo 6.
+# Los notebooks reciben estos valores como widgets/parámetros del Job; la API los lee al iniciar.
+# Lo marcado "(confirmar)" se cambia SOLO aquí.
+
+equipo:
+  numero: 6
+  prefijo_s3: equipo6               # carpeta del equipo dentro de cada bucket
 
 databricks:
   catalogo: workspace
-  esquemas:
-    bronce: g6_bronce
-    plata: g6_plata
-    oro: g6_oro
-  volumenes:
-    crudos: /Volumes/workspace/g6_bronce/crudos
-    artifacts: /Volumes/workspace/g6_oro/artifacts
-  rutas_bronce:
-    fotos: /Volumes/workspace/g6_bronce/crudos/fotos
-    mem: /Volumes/workspace/g6_bronce/crudos/mem
-    fred: /Volumes/workspace/g6_bronce/crudos/fred
-    etiquetas: /Volumes/workspace/g6_bronce/crudos/etiquetas
-    api_logs: /Volumes/workspace/g6_bronce/crudos/api_logs
-  tablas:
-    bronce:
-      inventario: workspace.g6_bronce.inventario
-    plata:
-      lecturas_ocr: workspace.g6_plata.lecturas_ocr
-      precios_mem: workspace.g6_plata.precios_mem
-      subsidios: workspace.g6_plata.subsidios
-      exogenas_diarias: workspace.g6_plata.exogenas_diarias
-      api_predicciones: workspace.g6_plata.api_predicciones
-    oro:
-      precios_estacion: workspace.g6_oro.precios_estacion
-      comparacion_mem: workspace.g6_oro.comparacion_mem
-      features_forecast: workspace.g6_oro.features_forecast
-      predicciones: workspace.g6_oro.predicciones
-      monitoreo_diario: workspace.g6_oro.monitoreo_diario
-  modelos:
-    extractor: workspace.g6_oro.extractor_gasolina
-    forecast: workspace.g6_oro.forecast_gasolina
-    alias: champion
-  experimentos:
-    ocr: g6_ocr_gasolina
-    forecast: g6_forecast_gasolina
-  jobs:
-    pipeline: g6_pipeline_semanal
-    monitoreo: g6_monitoreo_diario
+  esquemas:                         # (confirmar nombres con el catedrático)
+    bronze: equipo6_bronze
+    silver: equipo6_silver
+    gold: equipo6_gold
+  job: equipo6-pipeline
 
-combustibles: [diesel, regular, super, vpower]
+s3:
+  fotos: s3://cc3105-raw-869227452861-us-east-2-an/img/          # xloc-raw (solo lectura)
+  bronze: s3://cc3105-cusn-869227452861-us-east-2-an/equipo6     # xloc-cusn
+  silver: s3://cc3105-ag-869227452861-us-east-2-an/equipo6       # xloc-ag
+  gold: s3://cc3105-au-869227452861-us-east-2-an/equipo6         # xloc-au
+  region: us-east-2
 
-precios:
-  # Rango válido de un precio por galón (Q/gal). Fuera de esto no es un precio.
-  rango_valido:
-    min: 20.0
-    max: 60.0
+tablas:
+  bronze: [fotos_precios]
+  silver: [precios, precios_rejected]
+  gold: [precio_semanal, variacion_semanal, features_modelo, predicciones, metricas_modelo]
 
-reglas:
-  super_menos_regular: 1.00
-  vpower_menos_super: 0.50
-  tolerancia: 0.05
-  tolerancia_ruta_a: 0.02       # |precio_A - precio_B| para decir que coinciden
-  tolerancia_mem_pct: 15        # |precio - referencia MEM| <= 15 %
+combustibles: [super, regular, diesel]
+modalidades: [autoservicio, servicio_completo, no_indica]
+
+calidad:
+  rango_precio: {min: 20.0, max: 60.0}     # Q/galón
+  confianza_minima: 0.5
+  formatos_foto: [.heic, .heif, .jpg, .jpeg, .png]
+
+semana:
+  inicio: martes                           # semanas martes-lunes, igual que el MEM
+
+direccion:
+  umbral_q: 0.10                           # |dif_q| <= umbral -> se_mantiene
+  clases: [sube, baja, se_mantiene]
 
 extraccion:
   motor: rapidocr
   preproc: gris_clahe
-  estrategia: fusion            # solo_A | solo_B | fusion
-  segunda_pasada: false
-  umbral_score: 0.7             # score_confianza >= umbral => lectura "aprobada"
-
-forecast:
-  tipo_cambio: 7.7              # Q por USD (constante)
-  series_fred:
-    gasolina_gulf: DGASUSGULF
-    diesel_gulf: DDFUELUSGULF
-    wti: DCOILWTICO
-  semanas_test: 8
 
 api:
-  max_mb: 15
-  extensiones: [.jpg, .jpeg, .png, .heic, .heif]
-  zona_horaria_utc: -6          # Guatemala (sin horario de verano)
-
-monitoreo:
-  umbrales:
-    pct_score_bajo_max: 30            # % de lecturas con score < umbral_score
-    drift_vs_mem_pct_max: 10          # desviación promedio vs referencia MEM
-    ratio_mae_prod_vs_validacion_max: 2.0
-    latencia_p95_ms_max: 5000
+  puerto: 8006                             # 80XX del equipo (confirmar)
+  limit_default: 100
+  limit_max: 1000
+  oro_ttl_segundos: 300                    # cada cuánto se vuelven a leer las tablas Oro
+  zona_horaria_utc: -6                     # Guatemala
