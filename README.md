@@ -9,9 +9,13 @@ en un Droplet de DigitalOcean.
 - API: `http://159.65.111.14:8006` · Swagger: `/docs` (puerto 80XX del equipo; confirmar)
 - Enunciado: [`docs/enunciado_cc3105_proyecto_final.pdf`](docs/enunciado_cc3105_proyecto_final.pdf)
 - Instructivo del equipo: [`docs/instructivos/INSTRUCTIVO_GENERAL.md`](docs/instructivos/INSTRUCTIVO_GENERAL.md)
-- Diagrama: [`docs/arquitectura.png`](docs/) · Informe: [`docs/informe.pdf`](docs/) · Presentación: [`presentacion/`](presentacion/)
+- Diagrama: [`docs/arquitectura.png`](docs/arquitectura.png) · Informe: [`docs/informe.pdf`](docs/) · Presentación: [`presentacion/`](presentacion/)
 
 ## Arquitectura
+
+![Arquitectura](docs/arquitectura.png)
+
+Editable en [app.diagrams.net](https://app.diagrams.net) con `docs/arquitectura.drawio`; se regenera con `python scripts/generar_arquitectura.py`. Resumen en texto:
 
 ```
 s3://cc3105-raw-…/img/  ──►  BRONCE  s3://cc3105-cusn-…/equipo6/   bronze.fotos_precios (Auto Loader, incremental)
