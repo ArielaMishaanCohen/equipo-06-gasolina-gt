@@ -1,8 +1,8 @@
-# Instructivo de rol: Modelos
+# Guía de rol: Modelos (v3)
 
-Proyecto Final ML Engineering · Grupo 6 · Responsable: ________
+Proyecto Final ML Engineering · Equipo 06 (confirmar) · Responsable: ________
 
-Este documento es tu lista de tareas en orden, con los prompts completos. El mapa del proyecto (arquitectura, contratos, calendario) está en `INSTRUCTIVO_GENERAL.md`; léete al menos las secciones 1, 2 y 4 (15 minutos). Todo tu trabajo es con el servidor apagado: en tu Mac y en Databricks.
+Esta guía es tu lista de tareas en orden, con los prompts completos. El mapa del proyecto está en `INSTRUCTIVO_GENERAL.md` v3: léete al menos las secciones 0, 1, 3 y 5 (20 minutos). Tu trabajo vale la extracción de Plata (la mayor parte de 15 puntos) y el modelo de predicción (10), y define los puntos extra por la mejor predicción de la semana 5.
 
 ---
 
@@ -10,348 +10,210 @@ Este documento es tu lista de tareas en orden, con los prompts completos. El map
 
 | Qué | Detalle |
 | --- | --- |
-| Entregas | Etiquetas manuales; lectura de metadata EXIF; OCR + reglas + fusión de las dos rutas; evaluación; experimentos de OCR en MLflow; modelo de pronóstico; modelos registrados en Unity Catalog; artifacts `ocr_config.json`, `forecast.joblib`, `forecast_meta.json` y `predicciones.json`. |
-| Dependes de | Producción: repo base (hoy). Datos: `g6_oro.features_forecast` (miércoles 10:00 p. m.) para el pronóstico y las fotos en bronce para los experimentos. |
-| Dependen de ti | La API de Ariela y el notebook `02_plata` de Datos llaman a tu `extraer_precios`. Por eso su salida tiene que respetar el contrato 4.1 exactamente. |
-| Tus archivos | `metadata.py`, `ocr.py`, `reglas.py`, `extraccion.py`, `forecast.py`, las funciones `extraer` y `evaluar` de `cli.py`, sus tests, `notebooks/04_experimentos_ocr.py`, `notebooks/05_forecast.py` |
+| Entregas | `extraer_precios` (OCR + reglas) para fotos genéricas; la parte de extracción de `02_silver`; revisión manual de 20+ fotos con % de aciertos; experimentos de OCR en MLflow; clasificador `sube`/`baja`/`se_mantiene` frente a la línea base; `gold.predicciones` y `gold.metricas_modelo`. |
+| Dependes de | Datos: `bronze.fotos_precios` (semana 1) y `gold.features_modelo` (semana 3). |
+| Dependen de ti | Datos necesita `extraer_precios` real en la semana 2 para llenar `silver.precios`. La API lee tus tablas de predicción y métricas. |
+| Tus archivos | `src/gasolina/metadata.py`, `ocr.py`, `reglas.py`, `extraccion.py`, `modelo.py`, la parte de extracción de `pipelines/02_silver.py`, la parte de modelo de `pipelines/03_gold.py`, `pipelines/04_experimentos_ocr.py`, sus tests |
 | Tu rama | `modelos` |
-| No toques | `api/`, `sync.py`, `docker/`, `scripts/`, `.github/` (Producción) ni `externos.py`, `features.py` y los notebooks 00–03 y 06 (Datos). Si necesitas una dependencia nueva en `pyproject.toml` o un valor en `config/config.yaml`, pídeselo a Ariela. |
+| No toques | `api/`, `scripts/`, `.github/` (Producción) ni `calidad.py`, `features.py`, `01_bronze.py` (Datos). Cambios en `pyproject.toml` o `config.yaml`: pídeselos a Ariela. |
 
-Fechas límite:
+Hitos:
 
-| Hito | Cuándo | Qué tiene que existir |
+**Se entrega la próxima semana** (confirmar el día; el plan supone el martes 17). Ya hay permisos para leer las fotos. "Semana 1 … 5" en esta guía son bloques de días:
+
+| Bloque | Cuándo | Qué tiene que existir |
 | --- | --- | --- |
-| Hoy | Martes 10 | `etiquetas.csv` completo (y fotos nuevas si pueden). |
-| H1 | Miércoles 11, 10:00 p. m. | Metadata + OCR + reglas + fusión funcionando en tu Mac, con `gasolina-evaluar`, mergeado a `main` (avisa en el chat: "OCR real en main"). |
-| H2 | Jueves 12, 2:00 p. m. | Experimentos de OCR y de pronóstico en MLflow, modelos registrados y los 4 artifacts en `g6_oro/artifacts`. |
-| H3 | Jueves 12, 10:00 p. m. | Simulacro en llamada. |
-| Viernes | En clase | Generar tráfico real contra el servidor y ayudar con el video. |
+| Semana 1 | Mar 10 (noche) – Mié 11 | Fotos del catedrático revisadas y clasificadas por tipo; plantilla `etiquetas.csv` con 20+ fotos; OCR probado. |
+| Semana 2 | Mié 11 – Jue 12 | `extraer_precios` real (contrato 5.2) en `main`; `02_silver` llenando `silver.precios`; exactitud medida en 20+ fotos. |
+| Semana 3 | Vie 13 – Sáb 14 | Clasificador y línea base con validación temporal en MLflow; `gold.predicciones` y `gold.metricas_modelo`. |
+| Semana 5 | Dom 15 – Lun 16 | Informe (extracción y modelo); predicción de la semana siguiente registrada (puntos extra). |
 
-Contrato clave (sección 4.1 del general): `extraer_precios` devuelve siempre todas las claves, con `null` donde no se pudo leer, y `"modo": "real"`. Si necesitas cambiar algo del contrato, avísalo en el chat antes de tocar código.
-
----
-
-## 2. Hoy, sin necesitar el repo ⏸
-
-### 2.1 ⭐ Etiquetas manuales (la "verdad" para medir el OCR)
-
-Sin esto no se puede decir qué tan bueno es el modelo. Abre cada foto (te las pasa Ariela) en Vista Previa, haz zoom en las 4 pantallitas y en la pantalla de arriba, y llena este archivo. Guárdalo como `datos/etiquetas.csv`:
-
-```csv
-archivo,diesel,regular,super,vpower,venta_total,galones
-IMG_8271.jpg,35.59,37.09,38.09,38.59,150.00,3.938
-IMG_8286.jpg,,,,,,
-IMG_8304.jpg,,,,,,
-IMG_8322.jpg,,41.09,42.09,42.59,150.00,
-IMG_8325.jpg,,,,,,
-```
-
-Ya está lo que se alcanza a leer en dos fotos. Verifícalo con zoom y completa lo que falta. Si un número no se lee bien ni a simple vista, déjalo vacío y anótalo como limitación para el reporte. Revisa también si se cumplen las reglas Super = Regular + 1.00 y V-Power = Super + 0.50 en las 5 fotos.
-
-Cuando esté listo, mándaselo a la persona de Datos (o súbelo tú) a `/Volumes/workspace/g6_bronce/crudos/etiquetas/etiquetas.csv`.
-
-✨ Recomendado: tomen más fotos esta semana (3 a 5 cada uno, en distintas gasolineras Shell, con la ubicación del iPhone activada, que se vean "Esta Venta" y las 4 pantallitas). Con 20 a 30 fotos la evaluación del OCR es mucho más creíble. Agrégalas a `etiquetas.csv` y súbelas a `crudos/fotos/`.
-
-### 2.2 Acceso a Databricks 🧱
-
-Entra con tu invitación del profesor (búscala en tu correo, también en spam). Si no la tienes, escríbele hoy.
+Contratos que te tocan: 5.2 (lo que devuelve `extraer_precios`), 5.3 (`silver.precios`), 5.4 (`gold.features_modelo`, `gold.predicciones`, `gold.metricas_modelo`).
 
 ---
 
-## 3. Cuando el repo exista (Ariela avisa en el chat)
+## 2. Preparación
 
-### 3.1 Tu Mac 💻
-
-Estructura de carpetas (para que funcionen las rutas `../datos` de los prompts):
-
-```
-<tu carpeta del proyecto>/
-  datos/            # las fotos originales + etiquetas.csv
-  gasolina-mlops/   # el repo
-```
+### 2.1 Tu Mac 💻
 
 ```bash
-cd "<tu carpeta del proyecto>"
-git clone https://github.com/USUARIO_DE_ARIELA/gasolina-mlops.git
-cd gasolina-mlops
+cd "<tu carpeta del proyecto>"     # aquí también va datos/ con fotos y etiquetas.csv
+git clone https://github.com/ArielaMishaanCohen/equipo-06-gasolina-gt.git
+cd equipo-06-gasolina-gt
 git checkout modelos
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-```
-
-Abre Claude Code en la carpeta `gasolina-mlops` para los prompts de abajo.
-
-### 3.2 Git folder en Databricks 🧱
-
-1. Workspace → tu carpeta de usuario → Create → Git folder.
-2. URL: `https://github.com/USUARIO_DE_ARIELA/gasolina-mlops.git` (si te pide conectar GitHub: Settings → Linked accounts → GitHub).
-3. Cambia a la rama `modelos`.
-4. Después de cada push desde tu Mac: botón de la rama → Pull.
-
-Primera celda de cada notebook:
-
-```python
-%pip install -e /Workspace/Users/TU_CORREO/gasolina-mlops
-dbutils.library.restartPython()
-```
-
-(Si `-e` falla en serverless, quítalo.)
-
-### 3.3 Rutina de Git
-
-```bash
-git checkout main && git pull
-git checkout modelos && git merge main
-# ... trabajas ...
-git add -A && git commit -m "Modelos: <qué hiciste>" && git push
-```
-
-Para integrar: Pull Request de `modelos` a `main`, CI en verde y merge. Avisa en el chat.
-
----
-
-## 4. Tareas en orden
-
-### 4.1 ⭐ Metadata (martes en la noche) 💻
-
-```
-PROMPT PARA CLAUDE CODE
-Implementa src/gasolina/metadata.py. Función leer_metadata(ruta) -> dict con:
-archivo, fecha_hora (ISO, de DateTimeOriginal o DateTime), lat, lon (decimales con signo,
-convertidos desde los grados/minutos/segundos del EXIF GPS), altitud, modelo_camara,
-ancho, alto, y sha256 del archivo (para trazabilidad/deduplicación). Las claves deben ser
-exactamente las del contrato 4.1 de docs/INSTRUCTIVO_GENERAL.md.
-Debe soportar JPG y HEIC (registra pillow_heif). Si falta algún campo, pon None, no truene.
-Luego crea tests/test_metadata.py que la pruebe con ../datos/IMG_8271.jpg si existe
-(skip si no existe). Corre los tests y muéstrame la salida para las 5 fotos de ../datos/.
-```
-
-Resultado esperado: fechas del 9 al 30 de julio de 2026 y lat ≈ 14.5600, lon ≈ −90.4628 en todas.
-
-### 4.2 ⭐ OCR + reglas + fusión (miércoles) 💻
-
-```
-PROMPT PARA CLAUDE CODE
-Implementa ocr.py, reglas.py y extraccion.py para leer los 4 precios de bombas Shell.
-El diccionario que devuelve extraer_precios debe respetar EXACTAMENTE el contrato 4.1 de
-docs/INSTRUCTIVO_GENERAL.md: la API y el notebook de plata dependen de esas claves.
-No toques api/, sync.py, docker/ ni scripts/ (son de otra persona).
-
-Contexto de las fotos (bombas Gilbarco, ver ../datos/*.jpg):
-- Arriba hay una pantalla grande "Esta Venta" con el total en quetzales (ej. 150.00) y
-  debajo los galones con 3 decimales (ej. 3.938).
-- Abajo hay 4 pantallitas LCD de "Precio por galón", de izquierda a derecha:
-  Diesel, Regular (FuelSave), Super (FuelSave), V-Power. Formato NN.NN (ej. 37.09).
-- Los dígitos son LCD de 7 segmentos; el OCR puede confundir 0/8, 1/7, 5/6 o perder el punto.
-
-ocr.py:
-- Clase base OcrEngine con método leer(imagen_np) -> lista de detecciones
-  {texto, confianza, bbox(x1,y1,x2,y2)}.
-- RapidOcrEngine usando rapidocr_onnxruntime (RapidOCR()).
-- EasyOcrEngine (import perezoso, allowlist "0123456789.") solo si está instalado.
-- Preprocesamientos configurables: "ninguno", "gris_clahe", "gris_clahe_x2" (upscale 2x),
-  "binarizado". Reduce la imagen a ~1600 px de alto antes de OCR para que sea rápido.
-
-reglas.py:
-- normalizar_numero(texto): quitar espacios, cambiar , por ., si hay 4 dígitos sin punto
-  insertar punto antes de los 2 últimos; devolver float o None.
-- Candidatos a precio: valores con 2 decimales en el rango [precio_min, precio_max] del config
-  (por defecto 20–60 Q/gal). Excluir el total de venta (ej. 150.00, rango > 60) y los galones
-  (3 decimales).
-- Asignación: de los candidatos, tomar el grupo de 4 que estén aproximadamente en la misma
-  fila (centro y similar, tolerancia relativa a la altura de la imagen) y ordenarlos por x:
-  diesel, regular, super, vpower. Si hay menos de 4, asignar los que se pueda por posición
-  relativa y dejar None el resto.
-- Validaciones (cada una devuelve {nombre, estado: ok|falla|advertencia, mensaje}):
-  1. formato_y_rango
-  2. orden_gasolinas: regular < super < vpower
-  3. diferencias_tipicas: super - regular ≈ 1.00 y vpower - super ≈ 0.50 (tolerancia 0.05);
-     es "advertencia", no error
-  4. venta_entre_galones: si se leyó total y galones, total/galones debe ser ≈ alguno de
-     los 4 precios (tolerancia 0.02)
-  5. referencia_mem (opcional, si se pasa un dict de referencia): |precio - ref| <= 15%
-- Correcciones: si una validación de diferencias falla y se puede reconstruir un precio
-  faltante o claramente mal leído desde los otros (ej. super = regular + 1.00), proponerlo
-  marcándolo como "inferido" (nunca sobrescribir sin marcar).
-- score_confianza 0-1: combina confianza promedio del OCR y fracción de validaciones ok.
-
-DOS RUTAS + FUSIÓN (muy importante, lo pidió el profesor):
-- Ruta A (arriba): detectar el total de "Esta Venta" (valor con 2 decimales, típicamente
-  > 60, en la mitad superior de la imagen) y los galones (valor con 3 decimales justo debajo).
-  precio_A = round(total / galones, 2).
-- Ruta B (abajo): los 4 precios de las pantallitas como se describe arriba.
-- fusionar(ruta_a, ruta_b, reglas): sigue estos pasos:
-  1. buscar qué precio de B está a <= 0.02 de precio_A → combustible_despachado, ambos
-     verificados (fuente "ambas");
-  2. si ninguno coincide pero precio_A coincide con un precio implicado por las reglas,
-     corregir ese precio de B (fuente "corregido_por_ruta_A");
-  3. si B falló, reconstruir con reglas desde precio_A (fuente "inferido");
-  4. registrar las discrepancias.
-- Parámetro estrategia ∈ {"solo_A", "solo_B", "fusion"} en extraer_precios y en el CLI.
-
-extraccion.py:
-- extraer_precios(ruta, motor="rapidocr", preproc="gris_clahe", estrategia="fusion",
-  referencia=None) -> dict del contrato 4.1: metadata, ruta_a {total, galones, precio_a},
-  precios {diesel, regular, super, vpower}, fuentes por precio
-  ("ruta_A"|"ruta_B"|"ambas"|"corregido_por_ruta_A"|"inferido"), combustible_despachado,
-  validaciones, score_confianza, detecciones_crudas, tiempo_ms, version_modelo, "modo": "real".
-
-cli.py (solo las funciones extraer y evaluar):
-- gasolina-extraer RUTA [--motor] [--preproc] [--estrategia] → imprime JSON bonito.
-- gasolina-evaluar --etiquetas ../datos/etiquetas.csv --imagenes ../datos [--motor] [--preproc]
-  → por foto y global: accuracy exacta por precio (|pred-real| < 0.005), MAE, % de fotos con
-  los 4 correctos, tiempo promedio. Ignora celdas vacías del CSV.
-
-Escribe tests unitarios para reglas.py con casos sintéticos (no necesitan imágenes).
-gasolina-evaluar también debe medir la ruta A por separado (precio_A vs total/galones de
-etiquetas.csv) y reportar métricas por estrategia (solo_A, solo_B, fusion).
-Corre gasolina-evaluar con las combinaciones de motor rapidocr, los 4 preprocesamientos y
-las 3 estrategias y muéstrame una tabla de resultados. Si la accuracy es baja, analiza las
-detecciones crudas de las fotos que fallan y propone mejoras (ej. recortar la franja inferior
-donde están las pantallitas antes del OCR). Implementa la mejora y vuelve a evaluar.
-```
-
-Cómo sabes que quedó bien:
-
-```bash
-gasolina-extraer ../datos/IMG_8271.jpg
-```
-
-Debe devolver `regular: 37.09, super: 38.09, vpower: 38.59` (y diesel si se lee), con validaciones en `ok`.
-
-Si el OCR lee mal los dígitos de 7 segmentos, la mejora más efectiva suele ser:
-
-1. Recortar solo la franja de las 4 pantallitas (detectarla con el OCR en una primera pasada, o con las pantallitas oscuras).
-2. Ampliar ese recorte 3x.
-3. Volver a leer.
-
-```
-PROMPT PARA CLAUDE CODE
-Implementa una segunda pasada de OCR sobre la franja de las pantallitas ampliada 3x
-(parámetro segunda_pasada=True/False en extraer_precios y en el CLI) y compara con
-gasolina-evaluar contra la versión sin segunda pasada.
-```
-
-Antes del merge, verifica que la API de Ariela siga funcionando con tu código:
-
-```bash
+python3.11 -m venv .venv && source .venv/bin/activate
 pip install -e ".[api,dev]"
 pytest
-gasolina-api &
-sleep 5 && curl -F "foto=@../datos/IMG_8271.jpg" http://localhost:8000/extraer
-kill %1
 ```
 
-Checklist H1:
+Si sale `No module named 'gasolina'` en una Mac, corre `chflags -R nohidden .venv`.
 
-- [ ] `gasolina-evaluar` da una tabla con métricas por motor, preprocesamiento y estrategia (guárdala: va al reporte).
-- [ ] Hay al menos una configuración con ≥ 90 % de precios correctos en las fotos etiquetadas (meta). Si no se llega, documenta por qué y cómo las reglas lo compensan.
-- [ ] `pytest` pasa (incluidos los tests de la API).
-- [ ] PR a `main` con CI en verde y merge; aviso "OCR real en main".
+### 2.2 Git folder en Databricks 🧱
 
-### 4.3 ⭐ Experimentos de OCR en MLflow (jueves en la mañana) 🧱
+Workspace → tu carpeta → Create → Git folder → URL del repo → rama `modelos`. Haz commits desde ahí también: la rúbrica cuenta los commits de cada integrante.
 
-Esta es la parte de "MLOps de verdad": no elegimos el motor por gusto, sino con experimentos registrados.
+### 2.3 Rutina de Git
 
+```bash
+git checkout main && git pull && git checkout modelos && git merge main
+# ... trabajas ...
+git add -A && git commit -m "modelos: <qué hiciste>" && git push
 ```
-PROMPT PARA CLAUDE CODE
-Crea notebooks/04_experimentos_ocr.py (notebook de Databricks) que:
-1. Lea etiquetas.csv desde /Volumes/<cat>/g6_bronce/crudos/etiquetas/etiquetas.csv
-   (yo la subiré ahí) y las fotos desde /Volumes/<cat>/g6_bronce/crudos/fotos/.
-2. Use mlflow.set_experiment("/Users/<correo>/g6_ocr_gasolina").
-3. Para cada combinación motor ∈ {rapidocr, easyocr (si se puede instalar)} × preproc ∈
-   {ninguno, gris_clahe, gris_clahe_x2, binarizado} × segunda_pasada ∈ {False, True} ×
-   estrategia ∈ {solo_A, solo_B, fusion}:
-   una corrida de MLflow con params, métricas (accuracy_precio, mae, pct_fotos_4_correctos,
-   tiempo_ms_promedio, pct_validaciones_ok) y como artifact un CSV con las predicciones
-   por foto.
-4. Al final, una tabla comparativa ordenada por accuracy y tiempo, y escribir el ganador
-   (motor, preproc, segunda_pasada, estrategia) en /Volumes/<cat>/g6_oro/artifacts/ocr_config.json
-   con el contrato 4.2 de docs/INSTRUCTIVO_GENERAL.md.
-5. Registrar el pipeline de extracción como modelo pyfunc de MLflow en Unity Catalog
-   (<cat>.g6_oro.extractor_gasolina): un PythonModel cuyo predict reciba un DataFrame con
-   columna imagen_base64 y devuelva los precios. Incluir pip_requirements.
-Si EasyOCR no se puede instalar o descargar sus pesos (restricción de internet), saltarlo
-y anotarlo en el notebook como limitación.
-```
-
-Revisa que `etiquetas.csv` esté en `crudos/etiquetas/`.
-
-Para ver los resultados: barra izquierda → Experiments → `g6_ocr_gasolina`. Selecciona varias corridas → Compare. Toma capturas.
-
-### 4.4 ⭐ Pronóstico (jueves, en cuanto Datos avise que `features_forecast` está lista) 🧱
-
-Qué se pronostica: el precio de referencia MEM (Ciudad de Guatemala) de la próxima semana, por combustible. Con el spread estación-vs-MEM de `comparacion_mem`, también se puede estimar el precio en "nuestra" estación.
-
-```
-PROMPT PARA CLAUDE CODE
-Crea notebooks/05_forecast.py (notebook de Databricks) usando <cat>.g6_oro.features_forecast:
-1. Validación temporal (TimeSeriesSplit o walk-forward con las últimas 8-10 semanas como test),
-   NUNCA mezclar futuro en entrenamiento.
-2. Modelos, cada uno con su corrida MLflow (experimento /Users/<correo>/g6_forecast_gasolina):
-   a) baseline ingenuo: precio de la próxima semana = precio de esta semana
-   b) Ridge con lags + exógenas + subsidio
-   c) GradientBoostingRegressor con los mismos features
-   Un modelo por combustible o uno global con one-hot del combustible (prueba ambos si da
-   tiempo). Métricas: MAE y RMSE en Q, MAPE, y "mejora vs baseline" (%).
-3. Gráfica real vs predicho en test (artifact png) e importancia de variables / coeficientes.
-4. Registrar el mejor en Unity Catalog como <cat>.g6_oro.forecast_gasolina con alias
-   "champion" (mlflow.set_registry_uri("databricks-uc")). Solo promover si mejora al baseline;
-   si no mejora, promover el baseline y documentarlo (eso también es un resultado válido).
-5. Generar predicciones para la próxima semana y guardarlas en <cat>.g6_oro.predicciones
-   (fecha_generacion, semana_objetivo, combustible, prediccion, modelo, version).
-6. Exportar a /Volumes/<cat>/g6_oro/artifacts/: forecast.joblib (modelo champion),
-   forecast_meta.json y predicciones.json, ambos con el contrato 4.2 de
-   docs/INSTRUCTIVO_GENERAL.md. La API de producción solo lee predicciones.json.
-Explica en markdown, dentro del notebook, cómo interpretar cada resultado.
-```
-
-Cuidado (y punto fuerte para el reporte): el subsidio crea quiebres en la serie. Si el modelo no sabe del subsidio, va a fallar justo en esas semanas. Incluir la dummy y mostrar la diferencia es un excelente hallazgo.
-
-Si `features_forecast` se atrasa, empieza el notebook con el CSV consolidado del MEM (`crudos/mem/precios_mem_consolidado.csv`) y solo con lags, y agrega las exógenas cuando llegue la tabla.
-
-Checklist H2:
-
-- [ ] Experimentos de OCR y de forecast visibles en MLflow con varias corridas.
-- [ ] Modelos registrados en Unity Catalog (Catalog → `g6_oro` → Models), el de pronóstico con alias `champion`.
-- [ ] `ocr_config.json`, `forecast.joblib`, `forecast_meta.json` y `predicciones.json` en `g6_oro/artifacts/`, todos con `"origen": "databricks"`.
-- [ ] Notebooks 04 y 05 en `main` (Datos agrega `05_forecast` al job semanal).
-- [ ] Aviso en el chat: "Artifacts de modelos en oro".
 
 ---
 
-## 5. Viernes en la clase ▶ (tu papel)
+## 3. Semana 1 — Preparar la extracción
 
-| Minuto | Qué hacer |
-| --- | --- |
-| 15–25 | Cuando Ariela diga que el despliegue está listo, desde la carpeta del repo: `python scripts/generar_trafico.py --url http://159.65.111.14:8000 --carpeta ../datos --repeticiones 3`. Luego sube 2 o 3 fotos nuevas desde la página. Captura de la tabla de resultados. |
-| 30–45 | Video de la demo (tú explicas la pestaña "Leer foto": ruta A, ruta B, fusión y validaciones). |
+### 3.1 ⭐ Conocer las fotos
+
+Las fotos oficiales las sube el catedrático a `s3://cc3105-cusn-…/fotos/AAAA-MM-DD/` y pueden ser **rótulos de gasolineras o tablas de precios de referencia del MEM**, no solo bombas Shell como las 5 nuestras. En cuanto se puedan leer (Datos avisa), descarga unas cuantas para mirarlas:
+
+```python
+# en un notebook de Databricks
+display(dbutils.fs.ls("s3://cc3105-cusn-869227452861-us-east-2-an/fotos/"))
+```
+
+Clasifícalas a ojo por tipo (`rotulo`, `bomba`, `tabla_mem`): eso define la estrategia de extracción.
+
+### 3.2 ⭐ Plantilla de revisión manual
+
+El enunciado exige revisar a mano **al menos 20 fotos** y reportar el % de precios extraídos correctamente. Crea `datos/etiquetas.csv` (fuera del repo, y también en `s3://cc3105-cusn-…/equipo-06/complementarias/etiquetas/`):
+
+```csv
+foto,fecha,combustible,modalidad,ubicacion,precio_q_galon
+2026-11-10/IMG_0001.jpg,2026-11-10,super,autoservicio,Shell Km 14,33.45
+```
+
+Una fila por precio visible en la foto. Si no se lee ni a simple vista, no se anota y se documenta como limitación.
 
 ---
 
-## 6. Para el reporte (después del viernes)
+## 4. Semana 2 — Extracción real
 
-Tú escribes las secciones 5 (Modelo de extracción) y 6 (Modelo de pronóstico) del reporte (estructura en la sección 10.2 del general). Junta: la tabla de `gasolina-evaluar`, las capturas de MLflow Compare (OCR y forecast), la tabla solo_A vs solo_B vs fusión, la gráfica real vs predicho, la comparación contra el baseline, el efecto del subsidio y 2 o 3 ejemplos de aciertos y errores con imagen.
+### 4.1 ⭐ Metadata
+
+```
+PROMPT PARA CLAUDE CODE
+Implementa src/gasolina/metadata.py: leer_metadata(ruta) -> dict con exactamente las claves
+de "metadata" del contrato 5.2 de docs/instructivos/INSTRUCTIVO_GENERAL.md: archivo,
+fecha_hora (ISO, de DateTimeOriginal o DateTime), lat y lon (decimales con signo desde el EXIF
+GPS), altitud, modelo_camara, ancho, alto y sha256. Soporta JPG, PNG y HEIC (pillow_heif). Si
+falta un campo: None, nunca excepción. Agrega leer_metadata_bytes(contenido, nombre) para
+usarla con la columna content de bronze.fotos_precios. Tests con ../datos/IMG_8271.jpg (skip
+si no existe).
+```
+
+### 4.2 ⭐ OCR + reglas para fotos genéricas
+
+```
+PROMPT PARA CLAUDE CODE
+Implementa ocr.py, reglas.py y extraccion.py para extraer precios de combustible de fotos
+genéricas de Guatemala: rótulos de gasolineras, pantallas de bombas y tablas de precios de
+referencia del MEM. El resultado de extraer_precios(ruta_o_bytes, motor="rapidocr",
+preproc="gris_clahe") debe respetar EXACTAMENTE el contrato 5.2 de
+docs/instructivos/INSTRUCTIVO_GENERAL.md (lista "registros" con combustible, precio_q_galon,
+modalidad, ubicacion, confianza y texto_fuente). No toques api/, scripts/ ni calidad.py.
+- ocr.py: OcrEngine base; RapidOcrEngine (rapidocr_onnxruntime); EasyOcrEngine con import
+  perezoso; preprocesamientos "ninguno", "gris_clahe", "gris_clahe_x2", "binarizado"; reducir
+  a ~1600 px de alto.
+- reglas.py: normalizar_numero ("33,45" -> 33.45; "3345" -> 33.45; "Q33.45" -> 33.45);
+  detectar palabras clave de combustible (super/súper/premium, regular, diesel/diésel/ACPM,
+  y variantes con errores de OCR) y de modalidad (autoservicio, servicio completo); asociar
+  cada precio a la palabra clave más cercana en la misma fila o justo encima/debajo (usando
+  las bbox); clasificar tipo_foto. Para fotos de bomba sin palabras clave, ordenar las
+  pantallitas por x como en la v2.
+- Validaciones con {nombre, estado: ok|falla|advertencia, mensaje}; score_confianza 0-1.
+- Fecha: del EXIF; si no hay, la de la carpeta AAAA-MM-DD (parámetro fecha_carpeta).
+- Tests unitarios de reglas.py con detecciones sintéticas (sin imágenes).
+Luego crea el CLI gasolina-evaluar --etiquetas datos/etiquetas.csv --imagenes datos/ que
+reporte, por foto y global, el % de precios correctos (|pred - real| < 0.005), los precios
+no encontrados y los falsos positivos. Corre las combinaciones de preprocesamiento y
+muéstrame una tabla.
+```
+
+Si la exactitud es baja con rótulos, prueben: recortar la zona de los números antes de una segunda pasada, ampliar 2–3x, o (si el workspace lo permite) un modelo de visión con `ai_query` como experimento comparativo en MLflow.
+
+### 4.3 ⭐ Extracción en `02_silver` 🧱
+
+```
+PROMPT PARA CLAUDE CODE
+Implementa la parte de extracción de pipelines/02_silver.py (notebook de Databricks) según
+la Fase 2 del enunciado y el contrato 5.3: leer de bronze.fotos_precios solo las fotos que no
+estén procesadas con la version_modelo actual; aplicar extraer_precios a la columna content
+con una pandas UDF (o mapInPandas); explotar "registros" a una fila por combustible con
+fecha, combustible, precio_q_galon, modalidad, ubicacion (no_indica si falta), foto_origen,
+confianza, motor y version_modelo. Fotos sin registros van a la cuarentena con
+motivo "sin_precios_legibles". Deja un DataFrame "candidatos" listo para que la parte de
+Datos (calidad.py + MERGE) lo use al final del notebook. Widgets para catálogo, esquemas,
+motor y preproc.
+```
+
+### 4.4 ⭐ Exactitud de la revisión manual
+
+Corre `gasolina-evaluar` sobre las 20+ fotos etiquetadas y guarda la tabla: es un resultado obligatorio del informe y del notebook de Plata (muéstrala también en `02_silver`).
+
+### 4.5 Experimentos de OCR en MLflow (recomendado)
+
+```
+PROMPT PARA CLAUDE CODE
+Crea pipelines/04_experimentos_ocr.py (notebook de Databricks): con las fotos de bronce y
+etiquetas.csv, una corrida de MLflow por combinación de motor (rapidocr, easyocr si se puede
+instalar) y preproc, con métricas pct_precios_correctos, pct_fotos_completas, falsos_positivos
+y tiempo_ms_promedio, y como artifact un CSV por foto. Al final, tabla comparativa y el
+ganador escrito en config (motor y preproc que usará 02_silver).
+```
+
+---
+
+## 5. Semana 3 — Modelo de predicción
+
+### 5.1 ⭐ Clasificador frente a la línea base
+
+```
+PROMPT PARA CLAUDE CODE
+Implementa src/gasolina/modelo.py y la parte de modelo de pipelines/03_gold.py según la
+Fase 3 del enunciado y el contrato 5.4 del instructivo general, usando gold.features_modelo:
+1. Objetivo: direccion_siguiente (sube, baja, se_mantiene) por combustible.
+2. Validación temporal (walk-forward o las últimas 8-10 semanas como prueba), NUNCA aleatoria.
+3. Modelos: línea base ("se repite la dirección de la semana anterior"), regresión logística
+   y árbol de decisión (sklearn), con un modelo global y one-hot del combustible.
+4. MLflow (experimento /Users/<correo>/equipo06_direccion): una corrida por modelo con
+   parámetros, accuracy, F1 macro, matriz de confusión (png) y comparación contra la línea
+   base. Registrar el elegido en Unity Catalog si hay permiso; si no, como modelo de MLflow.
+5. Si ningún modelo supera a la línea base, se elige la línea base y se documenta (es un
+   resultado válido).
+6. Escribir gold.predicciones (predicción de la semana siguiente con probabilidad y
+   prediccion_baseline; actualizar direccion_real de semanas pasadas) y gold.metricas_modelo,
+   con COMMENT en tablas y columnas.
+Tests de modelo.py con datos sintéticos.
+```
+
+Ojo con el subsidio temporal: crea quiebres en la serie. Si el modelo no lo conoce, falla justo en esas semanas; incluir `subsidio_activo` y mostrar la diferencia es un buen hallazgo para el informe.
+
+### 5.2 Revisar que las tablas quedaron bien 🧱
+
+```sql
+%sql
+SELECT * FROM workspace.equipo_06_gold.predicciones ORDER BY semana_objetivo DESC;
+SELECT * FROM workspace.equipo_06_gold.metricas_modelo ORDER BY fecha_entrenamiento DESC;
+```
+
+---
+
+## 6. Semanas 4 y 5
+
+- Semana 5: dejar registrada la predicción de la semana siguiente (puntos extra para la mejor).
+- Informe: secciones de extracción (exactitud) y de modelo (frente a la línea base).
+- Presentación: explicar "de la foto al dato" y "el modelo" sin jerga.
 
 ---
 
 ## 7. Problemas comunes
 
-| Problema | Causa probable | Solución |
-| --- | --- | --- |
-| El OCR lee `3809` sin punto | Típico en LCD | `normalizar_numero` inserta el punto. Revisa los tests. |
-| `rapidocr_onnxruntime` no instala | Versión de Python | Usa Python 3.10 o 3.11 en el venv. |
-| EasyOCR no instala en Databricks | Internet restringido o pesos grandes | Saltarlo y documentarlo como limitación (lo pide el prompt). |
-| `%pip install` falla en Databricks | Ruta del repo mal escrita | Clic derecho en la carpeta → Copy path. |
-| La API de Ariela truena con tu código | Clave del contrato distinta | Compara tu salida con el contrato 4.1 clave por clave. |
-| El modelo de pronóstico no le gana al baseline | Pocas semanas o quiebres por subsidio | Es un resultado válido: promueve el baseline y documéntalo. |
-
-Para cualquier error, pégaselo a Claude Code:
-
-```
-PROMPT PARA CLAUDE CODE
-Estoy en el paso [X.Y] del instructivo [general / de mi rol]. Corrí: [comando]. Me salió:
-[error completo]. Estoy en [mi Mac / el servidor / Databricks]. Explícame qué significa y
-dame el arreglo paso a paso.
-```
+| Problema | Solución |
+| --- | --- |
+| El OCR lee `3345` sin punto | `normalizar_numero` inserta el punto antes de los 2 últimos dígitos. |
+| Asocia el precio al combustible equivocado | Revisa la distancia entre bbox; prueba asociar por fila (misma altura) antes que por columna. |
+| EasyOCR no se instala en el cluster | Sáltalo y anótalo como limitación; compara RapidOCR con distintos preprocesamientos. |
+| La exactitud del modelo es igual a la de la línea base | Normal con pocas semanas. Documéntalo y explica por qué (precios regulados, cambios poco frecuentes). |
+| La validación usa semanas futuras | Ordena por `semana_inicio` y corta por fecha, nunca con `train_test_split` aleatorio. |
