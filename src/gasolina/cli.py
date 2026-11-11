@@ -1,7 +1,7 @@
 """Entrypoints de línea de comandos.
 
   gasolina-extraer RUTA [--motor] [--preproc]                  (Modelos)
-  gasolina-evaluar [--etiquetas] [--imagenes]                  (Modelos; STUB)
+  gasolina-evaluar [--etiquetas] [--imagenes] [--estrategia]    (Modelos)
   gasolina-sync subir-logs                                     (Producción)
   gasolina-api [--host] [--port]                               (Producción; puerto de PUERTO)
 """
@@ -45,40 +45,25 @@ def extraer(argv: list[str] | None = None) -> None:
 
 
 def evaluar(argv: list[str] | None = None) -> None:
-    """STUB: la implementa Modelos (sección 8.1.2). Por ahora solo reporta qué evaluaría."""
+    """% de precios correctos contra la revisión manual (datos/etiquetas.csv)."""
+    from gasolina.evaluacion import evaluar_carpeta
+
     p = argparse.ArgumentParser(prog="gasolina-evaluar", description="Evalúa contra etiquetas.")
     p.add_argument("--etiquetas", type=Path, default=Path("../datos/etiquetas.csv"))
     p.add_argument("--imagenes", type=Path, default=Path("../datos"))
     p.add_argument("--motor", default="rapidocr")
     p.add_argument("--preproc", default="gris_clahe")
+    p.add_argument("--estrategia", default="fusion", choices=["fusion", "solo_B"])
+    p.add_argument("--sin-segunda-pasada", action="store_true")
+    p.add_argument("--detalle", action="store_true", help="incluir el resultado por foto")
     a = p.parse_args(argv)
-    filas = None
-    if a.etiquetas.is_file():
-        import pandas as pd
-
-        filas = len(pd.read_csv(a.etiquetas))
-    print(
-        json.dumps(
-            {
-                "modo": "stub",
-                "mensaje": "gasolina-evaluar todavía no está implementado (Modelos, 8.1.2).",
-                "etiquetas": str(a.etiquetas),
-                "etiquetas_existe": a.etiquetas.is_file(),
-                "filas_etiquetas": filas,
-                "imagenes": [p.name for p in _imagenes(a.imagenes)] if a.imagenes.exists() else [],
-                "motor": a.motor,
-                "preproc": a.preproc,
-                "metricas": {
-                    "pct_precios_correctos": None,
-                    "pct_fotos_completas": None,
-                    "falsos_positivos": None,
-                    "tiempo_ms_promedio": None,
-                },
-            },
-            indent=2,
-            ensure_ascii=False,
-        )
-    )
+    if not a.etiquetas.is_file():
+        p.error(f"No existe {a.etiquetas}")
+    out = evaluar_carpeta(a.etiquetas, a.imagenes, motor=a.motor, preproc=a.preproc,
+                          estrategia=a.estrategia, segunda_pasada=not a.sin_segunda_pasada)
+    if not a.detalle:
+        out.pop("por_foto")
+    print(json.dumps(out, indent=2, ensure_ascii=False, default=str))
 
 
 # ------------------------------------------------------------------ Producción
