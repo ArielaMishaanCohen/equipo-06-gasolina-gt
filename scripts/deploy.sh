@@ -100,14 +100,33 @@ if [ "$MODO" = docker ]; then
 else
   # --- 4V. Entorno virtual de Python ---
   export ARTIFACTS_DIR="$REPO/artifacts" LOGS_DIR="$REPO/logs" ENTORNO="${ENTORNO:-servidor}"
+  export PATH="$HOME/.local/bin:$PATH"
+  # Un .venv a medias (sin pip ni uv) se borra y se vuelve a crear.
+  if [ -d .venv ] && ! .venv/bin/python -m pip --version >/dev/null 2>&1 \
+     && [ ! -f .venv/.creado_con_uv ]; then
+    rm -rf .venv
+  fi
   if [ ! -x .venv/bin/python ]; then
     paso "Creando .venv"
-    python3 -m venv .venv || { command -v uv >/dev/null && uv venv .venv; } \
-      || { echo "❌ No se pudo crear el venv (¿falta python3-venv?)."; exit 1; }
+    if ! python3 -m venv .venv >/dev/null 2>&1; then
+      # Sin python3-venv (y sin sudo para instalarlo): usar uv, que se instala en ~/.local/bin.
+      rm -rf .venv
+      echo "python3-venv no está disponible; uso uv (sin sudo)."
+      if ! command -v uv >/dev/null; then
+        curl -LsSf https://astral.sh/uv/install.sh | sh \
+          || { echo "❌ No se pudo instalar uv."; exit 1; }
+      fi
+      uv venv -p python3 .venv || { echo "❌ No se pudo crear el venv con uv."; exit 1; }
+      touch .venv/.creado_con_uv
+    fi
   fi
   paso 'pip install -e ".[api]"'
-  .venv/bin/python -m pip install -q --upgrade pip
-  .venv/bin/python -m pip install -q -e ".[api]" || { echo "❌ pip install falló."; exit 1; }
+  if [ -f .venv/.creado_con_uv ]; then
+    uv pip install -p .venv/bin/python -q -e ".[api]" || { echo "❌ uv pip install falló."; exit 1; }
+  else
+    .venv/bin/python -m pip install -q --upgrade pip
+    .venv/bin/python -m pip install -q -e ".[api]" || { echo "❌ pip install falló."; exit 1; }
+  fi
 
   # --- 5V. Sincronizar artifacts ---
   paso "Sincronizando artifacts desde Databricks"
