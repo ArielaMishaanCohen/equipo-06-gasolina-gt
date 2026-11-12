@@ -101,10 +101,11 @@ except NameError:
 # Tipos del contrato; el sello de procesamiento se agrega aquí
 candidatos_t = (
     candidatos.select(
-        F.col("fecha").cast("date").alias("fecha"), "combustible",
-        F.col("precio_q_galon").cast("double").alias("precio_q_galon"), "modalidad", "ubicacion",
-        "foto_origen", F.col("confianza").cast("double").alias("confianza"), "motor",
-        "version_modelo")
+        # try_cast: un valor mal formado queda NULL (y lo rechaza una regla) en vez de truenar (ANSI)
+        F.expr("try_cast(fecha as date)").alias("fecha"), "combustible",
+        F.expr("try_cast(precio_q_galon as double)").alias("precio_q_galon"), "modalidad",
+        "ubicacion", "foto_origen", F.expr("try_cast(confianza as double)").alias("confianza"),
+        "motor", "version_modelo")
     .withColumn("_procesado_en", F.current_timestamp())
     .cache()
 )
@@ -140,7 +141,7 @@ mejor_por_llave = Window.partitionBy(*LLAVE).orderBy(F.col("confianza").desc(), 
 validos_unicos = (
     validos.withColumn("_n", F.row_number().over(mejor_por_llave)).filter("_n = 1").drop("_n")
     .select(
-        "fecha", "combustible", F.col("precio_q_galon").cast("decimal(6,2)").alias("precio_q_galon"),
+        "fecha", "combustible", F.expr("try_cast(precio_q_galon as decimal(6,2))").alias("precio_q_galon"),
         "modalidad", "ubicacion", "foto_origen", "confianza", "motor", "version_modelo", "_procesado_en")
     .cache()
 )
@@ -149,7 +150,7 @@ validos_unicos.createOrReplaceTempView("validos_a_cargar")
 
 rechazados_a_cargar = (
     rechazados.select(
-        "fecha", "combustible", F.col("precio_q_galon").cast("decimal(6,2)").alias("precio_q_galon"),
+        "fecha", "combustible", F.expr("try_cast(precio_q_galon as decimal(6,2))").alias("precio_q_galon"),
         "modalidad", "ubicacion", "foto_origen", "confianza", "motor", "version_modelo",
         "_procesado_en", "regla", "motivo")
     .cache()
@@ -226,7 +227,8 @@ else:
 
     comb_txt = sin_acento(F.col("combustible"))
     limpio = raw.select(
-        F.to_date(F.trim(F.col("semana_inicio"))).alias("fecha_dato"),
+        F.try_to_timestamp(F.trim(F.col("semana_inicio")), F.lit("yyyy-MM-dd")).cast("date")
+         .alias("fecha_dato"),
         F.when(comb_txt.isin("superior", "gasolina superior", "gasolina super"), "super")
          .when(comb_txt == "gasolina regular", "regular")
          .when(comb_txt == "combustible diesel", "diesel")
@@ -234,7 +236,8 @@ else:
         F.coalesce(F.when(F.trim("modalidad") == "", None).otherwise(sin_acento(F.col("modalidad"))),
                    F.lit("no_indica")).alias("modalidad"),
         F.trim("region").alias("region"),
-        F.regexp_replace(F.trim("precio_q_galon"), "^Q", "").cast("decimal(6,2)").alias("precio"),
+        F.expr("try_cast(regexp_replace(trim(precio_q_galon), '^Q', '') as decimal(6,2))")
+         .alias("precio"),
         F.trim("fuente_url").alias("fuente_url"),
     )
     n_raw = limpio.count()

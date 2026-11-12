@@ -189,11 +189,12 @@ def expresiones_reglas_spark(hoy=None, rango=None, confianza_min=None, combustib
 
     (rmin, rmax), cmin, catalogo, hoy = _parametros(rango, confianza_min, combustibles, hoy)
 
+    # try_cast: un valor mal formado queda NULL (y lo rechaza la regla) en vez de truenar (ANSI)
     comb = F.lower(F.trim(F.col("combustible").cast("string")))
     comb = F.when(comb == "", None).otherwise(comb)
-    precio = F.col("precio_q_galon").cast("double")
-    fecha = F.col("fecha").cast("date")
-    conf = F.col("confianza").cast("double")
+    precio = F.expr("try_cast(precio_q_galon as double)")
+    fecha = F.expr("try_cast(fecha as date)")
+    conf = F.expr("try_cast(confianza as double)")
     modalidad = F.coalesce(F.when(F.trim(F.col("modalidad")) == "", None)
                            .otherwise(F.trim(F.col("modalidad"))), F.lit(NO_INDICA))
     ubicacion = F.coalesce(F.when(F.trim(F.col("ubicacion")) == "", None)

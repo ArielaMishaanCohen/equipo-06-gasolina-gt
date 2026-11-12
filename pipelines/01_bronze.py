@@ -53,8 +53,10 @@ if not spark.catalog.tableExists(TABLA):
 def con_auditoria(df):
     """Columnas del contrato 5.1. fecha_carpeta sale de .../AAAA-MM-DD/foto (NULL si no hay carpeta)."""
     fecha_txt = F.regexp_extract(F.col("path"), r"/(\d{4}-\d{2}-\d{2})/[^/]+$", 1)
+    # try_to_timestamp: una carpeta con fecha imposible (2026-13-45) da NULL en vez de truenar (ANSI)
+    fecha_carpeta = F.try_to_timestamp(F.when(fecha_txt != "", fecha_txt), F.lit("yyyy-MM-dd"))
     return (
-        df.withColumn("fecha_carpeta", F.to_date(F.when(fecha_txt != "", fecha_txt)))
+        df.withColumn("fecha_carpeta", fecha_carpeta.cast("date"))
         .withColumn("_ingestion_timestamp", F.current_timestamp())
         .withColumn("_source_file", F.col("path"))
         .select("path", "modificationTime", "length", "content", "fecha_carpeta",
