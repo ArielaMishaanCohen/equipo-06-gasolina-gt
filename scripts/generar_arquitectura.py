@@ -42,7 +42,7 @@ NODOS = {
     "aws": ("AWS S3 · un bucket por capa (external locations de Unity Catalog)",
             300, 30, 1370, 250, "s3", True),
     "dbx": ("Databricks (workspace del curso)", 300, 330, 1370, 400, "dbx", True),
-    "job": ("Job equipo-06-pipeline · job cluster · trigger por archivo nuevo · correo si falla",
+    "job": ("Job equipo-06-pipeline · programado martes 7:00 (America/Guatemala) · correo si falla",
             330, 375, 1010, 215, "job", True),
     "droplet": ("Droplet DigitalOcean · 159.65.111.14 · usuario sin sudo",
                 300, 790, 1370, 360, "droplet", True),
