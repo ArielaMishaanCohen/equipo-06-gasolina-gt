@@ -1,18 +1,63 @@
 {
-  "_nota": "EJEMPLO. Reemplazar por la definición exportada del Job real (Jobs -> equipo6-pipeline -> View JSON).",
-  "name": "equipo6-pipeline",
+  "name": "equipo-06-pipeline",
+  "description": "Pipeline medallón del Equipo 06: Bronce (fotos y fuentes complementarias) -> Plata (precios, reglas de calidad, cuarentena) -> Oro (indicadores semanales, variables, modelo y predicciones).",
+  "format": "MULTI_TASK",
+  "max_concurrent_runs": 1,
+  "timeout_seconds": 7200,
+  "queue": {"enabled": true},
+  "git_source": {
+    "git_url": "https://github.com/ArielaMishaanCohen/equipo-06-gasolina-gt",
+    "git_provider": "gitHub",
+    "git_branch": "main"
+  },
   "tasks": [
-    {"task_key": "bronze", "notebook_task": {"notebook_path": "pipelines/01_bronze", "source": "GIT"}},
-    {"task_key": "silver", "depends_on": [{"task_key": "bronze"}],
-     "notebook_task": {"notebook_path": "pipelines/02_silver", "source": "GIT"}},
-    {"task_key": "gold", "depends_on": [{"task_key": "silver"}],
-     "notebook_task": {"notebook_path": "pipelines/03_gold", "source": "GIT"}}
+    {
+      "task_key": "bronze",
+      "description": "Ingesta incremental de fotos (Auto Loader, binaryFile) y fuentes complementarias a Bronce.",
+      "notebook_task": {"notebook_path": "pipelines/01_bronze", "source": "GIT"},
+      "timeout_seconds": 3600
+    },
+    {
+      "task_key": "silver",
+      "description": "Extracción de precios, reglas de calidad, MERGE en silver.precios y cuarentena en silver.precios_rejected.",
+      "depends_on": [{"task_key": "bronze"}],
+      "notebook_task": {"notebook_path": "pipelines/02_silver", "source": "GIT"},
+      "timeout_seconds": 3600
+    },
+    {
+      "task_key": "gold",
+      "description": "Precio semanal (martes a lunes), variación, variables del modelo, modelo y predicciones.",
+      "depends_on": [{"task_key": "silver"}],
+      "notebook_task": {"notebook_path": "pipelines/03_gold", "source": "GIT"},
+      "timeout_seconds": 3600
+    }
   ],
-  "git_source": {"git_url": "https://github.com/ArielaMishaanCohen/equipo-06-gasolina-gt", "git_provider": "gitHub", "git_branch": "main"},
   "parameters": [
     {"name": "catalogo", "default": "workspace"},
-    {"name": "umbral_q", "default": "0.10"}
+    {"name": "esquema_bronze", "default": "equipo6_bronze"},
+    {"name": "esquema_silver", "default": "equipo6_silver"},
+    {"name": "esquema_gold", "default": "equipo6_gold"},
+    {"name": "ruta_fotos", "default": "s3://cc3105-raw-869227452861-us-east-2-an/img/"},
+    {"name": "ruta_equipo_bronze", "default": "s3://cc3105-cusn-869227452861-us-east-2-an/equipo6"},
+    {"name": "ruta_equipo_silver", "default": "s3://cc3105-ag-869227452861-us-east-2-an/equipo6"},
+    {"name": "ruta_equipo_oro", "default": "s3://cc3105-au-869227452861-us-east-2-an/equipo6"},
+    {"name": "ruta_repo", "default": ""},
+    {"name": "modo", "default": "autoloader"},
+    {"name": "motor", "default": "rapidocr"},
+    {"name": "preproc", "default": "gris_clahe"},
+    {"name": "umbral_q", "default": "0.10"},
+    {"name": "modalidad_mem", "default": "autoservicio"}
   ],
-  "trigger": {"file_arrival": {"url": "s3://cc3105-raw-869227452861-us-east-2-an/img/"}},
-  "email_notifications": {"on_failure": ["CORREO_DEL_EQUIPO"]}
+  "schedule": {
+    "quartz_cron_expression": "0 0 7 ? * TUE",
+    "timezone_id": "America/Guatemala",
+    "pause_status": "UNPAUSED"
+  },
+  "email_notifications": {
+    "on_failure": [
+      "COMPLETAR-correo-integrante-1@example.invalid",
+      "COMPLETAR-correo-integrante-2@example.invalid",
+      "COMPLETAR-correo-integrante-3@example.invalid"
+    ]
+  }
 }
