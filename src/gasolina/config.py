@@ -126,7 +126,7 @@ def ajustes() -> Ajustes:
         oro_demo_dir=Path(_env("ORO_DEMO_DIR") or RAIZ_REPO / "artifacts_demo" / "oro"),
         logs_dir=Path(_env("LOGS_DIR", "./logs")),
         bronze_logs_path=_env("BRONZE_LOGS_PATH",
-                              "/Volumes/workspace/g6_bronce/crudos/api_logs").rstrip("/"),
+                              "/Volumes/workspace/equipo6_bronze/crudos/api_logs").rstrip("/"),
         entorno=_env("ENTORNO", "local"),
         puerto=int(_env("PUERTO", cfg["api"]["puerto"])),
     )

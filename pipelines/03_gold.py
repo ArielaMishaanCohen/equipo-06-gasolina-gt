@@ -2,7 +2,7 @@
 # MAGIC %md
 # MAGIC # 03_gold — Indicadores, variables, modelo y predicción (Fase 3)
 # MAGIC
-# MAGIC **ESQUELETO.** Partes: (1) `precio_semanal`, `variacion_semanal` y `features_modelo` —
+# MAGIC Partes: (1) `precio_semanal`, `variacion_semanal` y `features_modelo` —
 # MAGIC **Datos**; (2) entrenamiento con MLflow, `predicciones` y `metricas_modelo` — **Modelos**.
 # MAGIC Contrato 5.4 de `docs/instructivos/INSTRUCTIVO_GENERAL.md`: la API del servidor lee estas
 # MAGIC tablas (`workspace.equipo6_gold.<tabla>`, vía SQL warehouse), así que los nombres de
@@ -10,7 +10,30 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install ..
+# Instalar el paquete `gasolina` del repo. En un Job con git_source el repo está en una carpeta
+# de solo lectura (pip no puede construir ahí): se copia a /tmp, se construye el wheel en el
+# Volume del equipo (visible para driver y workers) y se instala ese wheel.
+import glob
+import os
+import shutil
+import subprocess
+import sys
+
+_src, _wheels = "/tmp/gasolina-src", "/Volumes/workspace/equipo6_bronze/crudos/_wheels"
+shutil.rmtree(_src, ignore_errors=True)
+shutil.copytree(os.path.abspath(".."), _src, ignore=shutil.ignore_patterns(
+    ".git", ".venv", "tests", "docs", "presentacion", "artifacts_demo", "*.egg-info", "__pycache__"))
+os.makedirs(_wheels, exist_ok=True)
+for _w in glob.glob(f"{_wheels}/gasolina-*.whl"):
+    os.remove(_w)
+subprocess.run([sys.executable, "-m", "pip", "wheel", "--no-deps", "-q", "-w", _wheels, _src],
+               check=True)
+WHEEL_GASOLINA = sorted(glob.glob(f"{_wheels}/gasolina-*.whl"))[-1]
+print(WHEEL_GASOLINA)
+
+# COMMAND ----------
+
+# MAGIC %pip install $WHEEL_GASOLINA
 
 # COMMAND ----------
 
@@ -169,7 +192,11 @@ else:
     print(f"⚠️ No existe {T_MEM}: precio_semanal sin filas del MEM (corre 02_silver).")
     mem_sem = spark.createDataFrame([], ESQ_PRECIO)
 
-precio_semanal = fotos_sem.unionByName(mem_sem).orderBy("fuente", "semana_inicio", "combustible").cache()
+precio_semanal = fotos_sem.unionByName(mem_sem).orderBy("fuente", "semana_inicio", "combustible")
+try:  # en serverless no hay cache(); el resultado es el mismo
+    precio_semanal = precio_semanal.cache()
+except Exception:
+    pass
 print("precio_semanal:", precio_semanal.groupBy("fuente").count().collect())
 
 # COMMAND ----------
@@ -322,5 +349,200 @@ display(ft.orderBy(F.col("semana_inicio").desc(), "combustible").limit(30))
 
 # MAGIC %md
 # MAGIC ## 2. Modelo y predicción (Modelos)
-# MAGIC TODO (guía de Modelos, 5.1): línea base vs. regresión logística y árbol de decisión con
-# MAGIC validación temporal en MLflow; escribir `predicciones` y `metricas_modelo`.
+# MAGIC
+# MAGIC `gasolina.modelo` (probado con datos sintéticos en `tests/test_modelo.py`):
+# MAGIC - Objetivo `direccion_siguiente` (sube / baja / se_mantiene), modelo global con one-hot del
+# MAGIC   combustible. Validación **temporal**: las últimas `n_semanas_test` semanas con objetivo
+# MAGIC   conocido son la prueba (nunca aleatoria).
+# MAGIC - Línea base ("se repite la dirección de esta semana") vs. regresión logística y árbol de
+# MAGIC   decisión. Una corrida de MLflow por modelo: parámetros, accuracy, F1 macro, matriz de
+# MAGIC   confusión (png) y comparación contra la línea base.
+# MAGIC - El elegido (mejor F1 macro **solo si supera a la línea base**; si no, la línea base) se
+# MAGIC   reentrena con todas las semanas, se registra y predice la semana siguiente.
+# MAGIC - Escribe `gold.predicciones` (histórico; `direccion_real` se llena cuando se conoce) y
+# MAGIC   `gold.metricas_modelo` (una fila por modelo y entrenamiento; `es_champion` = elegido).
+
+# COMMAND ----------
+
+dbutils.widgets.text("n_semanas_test", "10")
+dbutils.widgets.text("modelo_registrado", "")  # vacío = <catalogo>.<esquema_gold>.clasificador_direccion
+N_TEST = int(dbutils.widgets.get("n_semanas_test"))
+MODELO_UC = (dbutils.widgets.get("modelo_registrado").strip()
+             or f"{GOLD}.clasificador_direccion")
+
+import json
+import tempfile
+from datetime import datetime, timezone
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import mlflow
+import mlflow.sklearn
+from pyspark.sql.types import BooleanType, LongType, TimestampType
+
+from gasolina import __version__ as VERSION
+from gasolina import modelo
+
+usuario = spark.sql("SELECT current_user()").first()[0]
+mlflow.set_experiment(f"/Users/{usuario}/equipo06_direccion")
+AHORA = datetime.now(timezone.utc).replace(microsecond=0)
+
+feat_pd = spark.table(f"{GOLD}.features_modelo").toPandas()
+comp = modelo.entrenar_y_comparar(feat_pd, n_test=N_TEST)
+print(f"Entrenamiento: {comp.n_entrenamiento} filas | prueba: {comp.n_prueba} filas "
+      f"({comp.n_semanas_test} semanas: {comp.semanas_test[0]} a {comp.semanas_test[-1]})")
+
+
+def figura_confusion(nombre, m):
+    fig, ax = plt.subplots(figsize=(4, 3.5))
+    ax.imshow(m["matriz_confusion"], cmap="Blues")
+    ax.set_xticks(range(3), modelo.CLASES)
+    ax.set_yticks(range(3), modelo.CLASES)
+    ax.set_xlabel("predicción")
+    ax.set_ylabel("real")
+    for i, fila in enumerate(m["matriz_confusion"]):
+        for j, v in enumerate(fila):
+            ax.text(j, i, v, ha="center", va="center")
+    ax.set_title(f"{nombre}: acc {m['accuracy']:.2f} · F1 {m['f1_macro']:.2f}")
+    fig.tight_layout()
+    return fig
+
+
+run_ids = {}
+base = comp.baseline.metricas
+for nombre, r in comp.resultados.items():
+    with mlflow.start_run(run_name=f"{nombre} {AHORA:%Y-%m-%d}") as run:
+        mlflow.set_tags({"equipo": "06", "tipo": "clasificador_direccion",
+                         "version_modelo": VERSION})
+        mlflow.log_params({"modelo": nombre, "n_semanas_test": comp.n_semanas_test,
+                           "n_entrenamiento": comp.n_entrenamiento, "n_prueba": comp.n_prueba,
+                           "umbral_q": UMBRAL_Q, "features": ",".join(modelo.NUMERICAS + modelo.CATEGORICAS),
+                           **{f"clf_{k}": v for k, v in r.parametros.items()}})
+        mlflow.log_metrics({"accuracy": r.metricas["accuracy"], "f1_macro": r.metricas["f1_macro"],
+                            "accuracy_baseline": base["accuracy"],
+                            "f1_macro_baseline": base["f1_macro"],
+                            "supera_baseline": float(comp.supera_baseline(nombre))})
+        fig = figura_confusion(nombre, r.metricas)
+        mlflow.log_figure(fig, "matriz_confusion.png")
+        plt.close(fig)
+        mlflow.log_dict({"clases": modelo.CLASES, "matriz": r.metricas["matriz_confusion"],
+                         "semanas_test": [str(s) for s in comp.semanas_test]},
+                        "matriz_confusion.json")
+        run_ids[nombre] = run.info.run_id
+
+display(spark.createDataFrame(
+    [(n, r.metricas["accuracy"], r.metricas["f1_macro"], comp.supera_baseline(n), n == comp.elegido)
+     for n, r in comp.resultados.items()],
+    "modelo string, accuracy double, f1_macro double, supera_baseline boolean, elegido boolean"))
+print(f"Elegido: {comp.elegido}"
+      + ("" if comp.elegido != modelo.LINEA_BASE else
+         "  (ningún modelo superó a la línea base: se documenta en el informe)"))
+
+# COMMAND ----------
+
+# Reentrenar el elegido con todas las semanas, registrarlo y predecir la semana siguiente
+final = modelo.reentrenar_con_todo(feat_pd, comp.elegido)
+run_final = None
+if final is not None:
+    from mlflow.models import infer_signature
+
+    ult_X = feat_pd[modelo.NUMERICAS + modelo.CATEGORICAS].tail(5)
+    for c in modelo.NUMERICAS:
+        ult_X[c] = ult_X[c].astype(float)
+    with mlflow.start_run(run_name=f"{comp.elegido} final {AHORA:%Y-%m-%d}") as run:
+        mlflow.set_tags({"equipo": "06", "tipo": "clasificador_direccion", "champion": "true",
+                         "version_modelo": VERSION})
+        mlflow.log_params({"modelo": comp.elegido, "entrenado_con": "todas las semanas"})
+        info = mlflow.sklearn.log_model(final, "modelo", input_example=ult_X,
+                                        signature=infer_signature(ult_X, final.predict(ult_X)))
+        run_final = run.info.run_id
+    try:
+        mlflow.set_registry_uri("databricks-uc")
+        reg = mlflow.register_model(info.model_uri, MODELO_UC)
+        print(f"Registrado en Unity Catalog: {MODELO_UC} v{reg.version}")
+    except Exception as e:  # sin permiso de crear modelos en UC: queda como modelo de MLflow
+        print(f"⚠️ No se pudo registrar en UC ({str(e).splitlines()[0][:200]}); "
+              f"queda el modelo de MLflow del run {run_final}.")
+
+pred_pd = modelo.predecir(feat_pd, comp.elegido, final, VERSION,
+                          run_final or run_ids.get(comp.elegido), AHORA)
+display(pred_pd)
+
+# COMMAND ----------
+
+# MAGIC %md ### 2.1 Escritura de `predicciones` (histórico) y `metricas_modelo`
+
+# COMMAND ----------
+
+T_PRED, T_MET = f"{GOLD}.predicciones", f"{GOLD}.metricas_modelo"
+anteriores = spark.table(T_PRED).toPandas() if spark.catalog.tableExists(T_PRED) else None
+var_pd = spark.table(f"{GOLD}.variacion_semanal").select(
+    "semana_inicio", "combustible", "direccion").toPandas()
+historico = modelo.unir_predicciones(anteriores, pred_pd, var_pd)
+
+ESQ_PRED = StructType([
+    StructField("semana_objetivo", DateType()), StructField("combustible", StringType()),
+    StructField("prediccion", StringType()), StructField("probabilidad", DoubleType()),
+    StructField("prediccion_baseline", StringType()), StructField("modelo", StringType()),
+    StructField("version_modelo", StringType()), StructField("mlflow_run_id", StringType()),
+    StructField("fecha_generacion", TimestampType()), StructField("direccion_real", StringType()),
+])
+ESQ_MET = StructType([
+    StructField("fecha_entrenamiento", TimestampType()), StructField("modelo", StringType()),
+    StructField("version_modelo", StringType()), StructField("accuracy_modelo", DoubleType()),
+    StructField("accuracy_baseline", DoubleType()), StructField("f1_macro_modelo", DoubleType()),
+    StructField("f1_macro_baseline", DoubleType()), StructField("n_semanas_test", LongType()),
+    StructField("supera_baseline", BooleanType()), StructField("mlflow_run_id", StringType()),
+    StructField("es_champion", BooleanType()),
+])
+met_nuevas = modelo.filas_metricas(comp, VERSION, run_ids, AHORA)
+if spark.catalog.tableExists(T_MET):
+    met_previas = spark.table(T_MET).toPandas()
+    met_previas["es_champion"] = False  # el champion es solo el del último entrenamiento
+    met_pd = pd.concat([met_previas, met_nuevas], ignore_index=True)
+else:
+    met_pd = met_nuevas
+# Idempotencia: misma versión y mismo modelo el mismo día -> se queda la última corrida
+met_pd["_dia"] = pd.to_datetime(met_pd["fecha_entrenamiento"]).dt.date
+met_pd = met_pd.drop_duplicates(["_dia", "modelo", "version_modelo"], keep="last").drop(columns="_dia")
+
+# Se construyen desde pandas (datos locales), así que sobrescribir las tablas leídas es seguro.
+predicciones = a_spark(historico, ESQ_PRED)
+metricas_modelo = a_spark(met_pd, ESQ_MET)
+
+guardar_oro(predicciones,
+            "predicciones",
+            "Predicción de la dirección del precio (sube, baja, se_mantiene) para la semana siguiente, "
+            "por combustible. Histórico: una fila por semana objetivo y combustible; direccion_real "
+            "se llena cuando la semana ya ocurrió.",
+            {"semana_objetivo": "Martes de la semana predicha (semana martes a lunes).",
+             "combustible": "super, regular o diesel.",
+             "prediccion": "Dirección predicha por el modelo elegido: sube, baja o se_mantiene.",
+             "probabilidad": "Probabilidad de la clase predicha (nula si el elegido es la línea base).",
+             "prediccion_baseline": "Predicción de la línea base: la dirección de la semana actual.",
+             "modelo": "Modelo que hizo la predicción (regresion_logistica, arbol_decision o linea_base).",
+             "version_modelo": "Versión del paquete gasolina.",
+             "mlflow_run_id": "Run de MLflow del modelo usado.",
+             "fecha_generacion": "Fecha y hora (UTC) en que se generó la predicción.",
+             "direccion_real": "Dirección observada (variacion_semanal); nula hasta que la semana termine."})
+guardar_oro(metricas_modelo,
+            "metricas_modelo",
+            "Métricas de cada entrenamiento del clasificador frente a la línea base, en las últimas "
+            "n_semanas_test semanas (validación temporal). es_champion marca el modelo en uso.",
+            {"fecha_entrenamiento": "Fecha y hora (UTC) del entrenamiento.",
+             "modelo": "regresion_logistica, arbol_decision o linea_base.",
+             "version_modelo": "Versión del paquete gasolina.",
+             "accuracy_modelo": "Accuracy en las semanas de prueba.",
+             "accuracy_baseline": "Accuracy de la línea base en las mismas semanas.",
+             "f1_macro_modelo": "F1 macro (sube, baja, se_mantiene) en las semanas de prueba.",
+             "f1_macro_baseline": "F1 macro de la línea base en las mismas semanas.",
+             "n_semanas_test": "Cantidad de semanas de prueba (las más recientes con objetivo conocido).",
+             "supera_baseline": "true si el F1 macro del modelo es mayor que el de la línea base.",
+             "mlflow_run_id": "Run de MLflow con parámetros, métricas y matriz de confusión.",
+             "es_champion": "true para el modelo elegido en el último entrenamiento."})
+
+print(f"predicciones: {spark.table(T_PRED).count()} filas | "
+      f"metricas_modelo: {spark.table(T_MET).count()} filas")
+display(spark.table(T_PRED).orderBy(F.col("semana_objetivo").desc(), "combustible").limit(9))
+display(spark.table(T_MET).orderBy(F.col("fecha_entrenamiento").desc()))
