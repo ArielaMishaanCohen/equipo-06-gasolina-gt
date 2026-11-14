@@ -4,13 +4,13 @@
 # MAGIC
 # MAGIC **ESQUELETO.** Partes: (1) `precio_semanal`, `variacion_semanal` y `features_modelo` —
 # MAGIC **Datos**; (2) entrenamiento con MLflow, `predicciones` y `metricas_modelo` — **Modelos**.
-# MAGIC Contrato 5.4 de `docs/instructivos/INSTRUCTIVO_GENERAL.md`: la API lee estas tablas de
-# MAGIC `s3://cc3105-au-869227452861-us-east-2-an/equipo6/gold/<tabla>/`, así que los nombres de
+# MAGIC Contrato 5.4 de `docs/instructivos/INSTRUCTIVO_GENERAL.md`: la API del servidor lee estas
+# MAGIC tablas (`workspace.equipo6_gold.<tabla>`, vía SQL warehouse), así que los nombres de
 # MAGIC columnas tienen que ser exactamente esos.
 
 # COMMAND ----------
 
-# MAGIC %pip install /Workspace/Users/TU_CORREO/gasolina-mlops
+# MAGIC %pip install ..
 
 # COMMAND ----------
 
@@ -22,7 +22,7 @@ dbutils.widgets.text("catalogo", "workspace")
 dbutils.widgets.text("esquema_bronze", "equipo6_bronze")
 dbutils.widgets.text("esquema_silver", "equipo6_silver")
 dbutils.widgets.text("esquema_gold", "equipo6_gold")
-dbutils.widgets.text("ruta_equipo_oro", "s3://cc3105-au-869227452861-us-east-2-an/equipo6")
+dbutils.widgets.text("ruta_equipo_oro", "")  # vacío = tablas gestionadas; s3://… = externas
 dbutils.widgets.text("umbral_q", "0.10")
 dbutils.widgets.text("modalidad_mem", "autoservicio")
 
@@ -30,8 +30,8 @@ CATALOGO = dbutils.widgets.get("catalogo")
 BRONZE = f"{CATALOGO}.{dbutils.widgets.get('esquema_bronze')}"
 SILVER = f"{CATALOGO}.{dbutils.widgets.get('esquema_silver')}"
 GOLD = f"{CATALOGO}.{dbutils.widgets.get('esquema_gold')}"
-RUTA_EQUIPO_ORO = dbutils.widgets.get("ruta_equipo_oro").rstrip("/")
-RUTA_GOLD = f"{RUTA_EQUIPO_ORO}/gold"  # las tablas viven en <ruta_equipo_oro>/gold/<tabla>/
+RUTA_EQUIPO_ORO = dbutils.widgets.get("ruta_equipo_oro").strip().rstrip("/")
+RUTA_GOLD = f"{RUTA_EQUIPO_ORO}/gold" if RUTA_EQUIPO_ORO else ""  # <ruta>/gold/<tabla>/ si es S3
 UMBRAL_Q = float(dbutils.widgets.get("umbral_q"))
 MODALIDAD_MEM = dbutils.widgets.get("modalidad_mem")
 
@@ -42,10 +42,11 @@ def _lit(texto: str) -> str:
 
 
 def guardar_oro(df, tabla: str, comentario: str, columnas: dict | None = None):
-    """Escribe una tabla Oro externa en RUTA_GOLD/<tabla> (overwrite = idempotente) y le pone
-    COMMENT a la tabla y, si se pasan, a cada columna."""
+    """Escribe una tabla Oro (overwrite = idempotente): gestionada, o externa en
+    RUTA_GOLD/<tabla> si ruta_equipo_oro es s3://…; le pone COMMENT a la tabla y a cada columna."""
     (df.write.format("delta").mode("overwrite").option("overwriteSchema", "true")
-       .option("path", f"{RUTA_GOLD}/{tabla}").saveAsTable(f"{GOLD}.{tabla}"))
+       .options(**({"path": f"{RUTA_GOLD}/{tabla}"} if RUTA_GOLD else {}))
+       .saveAsTable(f"{GOLD}.{tabla}"))
     spark.sql(f"COMMENT ON TABLE {GOLD}.{tabla} IS {_lit(comentario)}")
     for columna, texto in (columnas or {}).items():
         spark.sql(f"ALTER TABLE {GOLD}.{tabla} ALTER COLUMN `{columna}` COMMENT {_lit(texto)}")
@@ -217,7 +218,7 @@ print(f"variacion_semanal: {len(variacion_pd)} filas | features_modelo: {len(fea
 
 # COMMAND ----------
 
-# MAGIC %md ### 1.4 Escritura (tablas externas en `<ruta_equipo_oro>/gold/<tabla>/`, `overwrite`) y `COMMENT`s
+# MAGIC %md ### 1.4 Escritura (`overwrite`, tablas gestionadas o externas según `ruta_equipo_oro`) y `COMMENT`s
 
 # COMMAND ----------
 

@@ -14,6 +14,10 @@ databricks:
     gold: equipo6_gold
   job: equipo6-pipeline
 
+# Workspace propio (13 nov): tablas gestionadas y archivos en este Volume.
+volumen_crudos: /Volumes/workspace/equipo6_bronze/crudos   # fotos/, complementarias/{mem,fred}/
+
+# Buckets del curso (alternativa: pasar estas rutas a los widgets ruta_* para tablas externas)
 s3:
   fotos: s3://cc3105-raw-869227452861-us-east-2-an/img/          # xloc-raw (solo lectura)
   bronze: s3://cc3105-cusn-869227452861-us-east-2-an/equipo6     # xloc-cusn

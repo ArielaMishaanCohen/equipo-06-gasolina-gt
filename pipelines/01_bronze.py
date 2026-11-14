@@ -2,7 +2,7 @@
 # MAGIC %md
 # MAGIC # 01_bronze — Ingesta incremental de fotos y fuentes complementarias (Fase 1)
 # MAGIC
-# MAGIC 1. Lee las fotos del bucket de fotos (solo lectura) con **Auto Loader**
+# MAGIC 1. Lee las fotos de `ruta_fotos` (por defecto el Volume `crudos/fotos/`) con **Auto Loader**
 # MAGIC    (`cloudFiles.format = binaryFile`, `trigger(availableNow=True)`) y las agrega a
 # MAGIC    `bronze.fotos_precios` (contrato 5.1) con `_ingestion_timestamp`, `_source_file` y
 # MAGIC    `fecha_carpeta`. El checkpoint recuerda qué archivos ya se cargaron: **una segunda corrida no
@@ -19,8 +19,8 @@
 
 dbutils.widgets.text("catalogo", "workspace")
 dbutils.widgets.text("esquema_bronze", "equipo6_bronze")
-dbutils.widgets.text("ruta_fotos", "s3://cc3105-raw-869227452861-us-east-2-an/img/")
-dbutils.widgets.text("ruta_equipo_bronze", "s3://cc3105-cusn-869227452861-us-east-2-an/equipo6")
+dbutils.widgets.text("ruta_fotos", "/Volumes/workspace/equipo6_bronze/crudos/fotos/")
+dbutils.widgets.text("ruta_equipo_bronze", "/Volumes/workspace/equipo6_bronze/crudos")
 dbutils.widgets.text("ruta_repo", "")  # carpeta del Git folder (solo informativo / %pip install)
 dbutils.widgets.dropdown("modo", "autoloader", ["autoloader", "batch_merge"])
 
@@ -30,6 +30,8 @@ RUTA_FOTOS = dbutils.widgets.get("ruta_fotos")
 RUTA_EQUIPO = dbutils.widgets.get("ruta_equipo_bronze").rstrip("/")
 RUTA_REPO = dbutils.widgets.get("ruta_repo")
 MODO = dbutils.widgets.get("modo")
+# Con s3:// las tablas *_raw son externas en esa ruta; con un Volume son gestionadas.
+EXTERNAS = RUTA_EQUIPO.startswith("s3://")
 
 TABLA = f"{CATALOGO}.{ESQUEMA}.fotos_precios"
 CHECKPOINT = f"{RUTA_EQUIPO}/_checkpoints/fotos_precios/"
@@ -156,7 +158,7 @@ for tabla, carpeta, patron, descripcion in COMPLEMENTARIAS:
     )
     (
         df.write.format("delta").mode("overwrite").option("overwriteSchema", "true")
-        .option("path", f"{RUTA_EQUIPO}/bronze/{tabla}")
+        .options(**({"path": f"{RUTA_EQUIPO}/bronze/{tabla}"} if EXTERNAS else {}))
         .saveAsTable(destino)
     )
     spark.sql(f"COMMENT ON TABLE {destino} IS '{descripcion} Columnas de auditoría: _ingestion_timestamp, _source_file.'")
