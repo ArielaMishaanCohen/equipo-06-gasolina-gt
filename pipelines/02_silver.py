@@ -8,7 +8,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install /Workspace/Users/TU_CORREO/gasolina-mlops
+# MAGIC %pip install ..
 
 # COMMAND ----------
 
@@ -58,8 +58,10 @@ PREPROC = dbutils.widgets.get("preproc")
 
 # COMMAND ----------
 
-dbutils.widgets.text("ruta_equipo_silver", "s3://cc3105-ag-869227452861-us-east-2-an/equipo6")
-RUTA_SILVER = dbutils.widgets.get("ruta_equipo_silver").rstrip("/")
+# Vacío = tabla gestionada (workspace propio). Con s3://… se crea como externa en esa ruta.
+dbutils.widgets.text("ruta_equipo_silver", "")
+RUTA_SILVER = dbutils.widgets.get("ruta_equipo_silver").strip().rstrip("/")
+LOCATION_MEM = f"LOCATION '{RUTA_SILVER}/silver/mem_referencia'" if RUTA_SILVER else ""
 
 T_PRECIOS = f"{SILVER}.precios"
 T_RECHAZADOS = f"{SILVER}.precios_rejected"
@@ -209,7 +211,7 @@ spark.sql(f"""
       _procesado_en  TIMESTAMP     COMMENT 'Fecha y hora de la carga a Plata'
     )
     USING DELTA
-    LOCATION '{RUTA_SILVER}/silver/mem_referencia'
+    {LOCATION_MEM}
     COMMENT 'Histórico semanal de precios de referencia del MEM, limpio y tipado. Semanas faltantes sin rellenar.'
 """)
 

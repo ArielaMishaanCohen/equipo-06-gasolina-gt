@@ -4,7 +4,7 @@ Notebooks en formato de Databricks (`# Databricks notebook source`). Se sincroni
 
 | Orden | Notebook | Dueño | Qué hace |
 | --- | --- | --- | --- |
-| 0 | `00_setup.sql` | Datos | Esquemas `equipo6_bronze/silver/gold` y tablas externas en `s3://…/equipo6/` (una vez). |
+| 0 | `00_setup.sql` | Datos | Esquemas `equipo6_bronze/silver/gold`, Volume `equipo6_bronze.crudos` y tablas gestionadas (una vez). |
 | 1 | `01_bronze.py` | Datos | Auto Loader (`binaryFile`) de `raw/img/` → `bronze.fotos_precios`, incremental, con auditoría. |
 | 2 | `02_silver.py` | Modelos + Datos | OCR → `silver.precios`; reglas de calidad → `silver.precios_rejected`; MERGE idempotente. |
 | 3 | `03_gold.py` | Datos + Modelos | `precio_semanal`, `variacion_semanal`, `features_modelo`; modelo (MLflow), `predicciones`, `metricas_modelo`. |

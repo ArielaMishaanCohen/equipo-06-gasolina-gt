@@ -39,21 +39,22 @@ C = {
 # id: (texto, x, y, ancho, alto, estilo, es_contenedor)
 NODOS = {
     # Contenedores
-    "aws": ("AWS S3 · un bucket por capa (external locations de Unity Catalog)",
+    "aws": ("Unity Catalog · catálogo workspace · tablas Delta gestionadas + Volume",
             300, 30, 1370, 250, "s3", True),
-    "dbx": ("Databricks (workspace del curso)", 300, 330, 1370, 400, "dbx", True),
+    "dbx": ("Databricks (workspace propio del equipo · Free Edition, serverless)",
+            300, 330, 1370, 400, "dbx", True),
     "job": ("Job equipo-06-pipeline · programado martes 7:00 (America/Guatemala) · correo si falla",
             330, 375, 1010, 215, "job", True),
     "droplet": ("Droplet DigitalOcean · 159.65.111.14 · usuario sin sudo",
                 300, 790, 1370, 360, "droplet", True),
     # S3
-    "raw": ("FOTOS (xloc-raw)\ncc3105-raw…/img/\n.HEIC con EXIF · solo lectura", 330, 85, 290, 150,
+    "raw": ("FOTOS (Volume)\nequipo6_bronze.crudos/fotos/\n.HEIC con EXIF", 330, 85, 290, 150,
             "raw", False),
-    "bronce": ("BRONCE (xloc-cusn)\ncc3105-cusn…/equipo6/\nfotos_precios · mem_referencia_raw",
+    "bronce": ("BRONCE\nworkspace.equipo6_bronze\nfotos_precios · mem_referencia_raw",
                660, 85, 300, 150, "bronce", False),
-    "plata": ("PLATA (xloc-ag)\ncc3105-ag…/equipo6/\nprecios · precios_rejected · mem",
+    "plata": ("PLATA\nworkspace.equipo6_silver\nprecios · precios_rejected · mem",
               1000, 85, 300, 150, "plata", False),
-    "oro": ("ORO (xloc-au)\ncc3105-au…/equipo6/gold/\nprecio_semanal · variacion_semanal\n"
+    "oro": ("ORO\nworkspace.equipo6_gold\nprecio_semanal · variacion_semanal\n"
             "features_modelo · predicciones\nmetricas_modelo", 1340, 85, 300, 165, "oro", False),
     # Databricks
     "t1": ("01_bronze\nbinaryFile / Auto Loader\nincremental · _ingestion_timestamp",
@@ -64,21 +65,21 @@ NODOS = {
            1040, 400, 280, 125, "tarea", False),
     "mlflow": ("MLflow\nexperimentos OCR y\nclasificador vs. línea base", 1375, 375, 270, 120,
                "aux", False),
-    "interactivo": ("Cluster interactivo\ndesarrollo · autoterminación ≤ 30 min", 1375, 520,
+    "interactivo": ("Cómputo serverless\nnotebooks (desarrollo) y Job", 1375, 520,
                     270, 95, "aux", False),
     "gitfolder": ("Git folder (repo sincronizado)\nnotebooks de pipelines/", 330, 610, 420, 80,
                   "aux", False),
     # Droplet
     "api": ("API FastAPI (uv + pyproject.toml + uv.lock)\n"
-            "puerto 8006 · nohup + @reboot · .env (600)\n"
-            "oro.py: lee Delta de S3 con credenciales de solo lectura\n(caché 5 min; tablas demo "
+            "puerto 8000 · nohup + @reboot · .env (600)\n"
+            "oro.py: lee Oro vía SQL warehouse (token en .env)\n(caché 5 min; tablas demo "
             "como respaldo)", 1010, 845, 640, 140, "api", False),
     "endpoints": ("GET /health · /precios/actual · /precios?combustible&desde&hasta&limit\n"
                   "/prediccion · /modelo/metricas · /docs (Swagger) · página web (QR)",
                   1010, 1010, 640, 110, "api", False),
     "logs": ("logs/*.jsonl\n(cron fin_de_clase.sh)", 640, 865, 270, 100, "api", False),
     # Actores
-    "profe": ("Catedrático\nsube fotos semanales", 30, 100, 220, 90, "actor", False),
+    "profe": ("Catedrático\nfotos semanales", 30, 100, 220, 90, "actor", False),
     "mem": ("MEM (histórico de\nprecios de referencia)", 30, 215, 220, 80, "ext", False),
     "equipo": ("Equipo 6\n(Mac + Claude Code)", 30, 560, 220, 90, "actor", False),
     "github": ("GitHub\nequipo-06-gasolina-gt\nActions: ruff + pytest +\nimagen GHCR · deploy",
@@ -91,7 +92,7 @@ TITULO_ABAJO = {"job": "bl", "dbx": "br"}
 
 # (origen, destino, texto, punteada[, puntos intermedios])
 FLECHAS = [
-    ("profe", "raw", "sube .HEIC", False),
+    ("profe", "raw", "se suben .HEIC", False),
     ("mem", "bronce", "CSV / PDF", True, [(700, 258)]),
     ("raw", "t1", "lee", False),
     ("t1", "bronce", "escribe", False),
@@ -102,7 +103,7 @@ FLECHAS = [
     ("plata", "t3", "lee", False),
     ("t3", "oro", "escribe", False),
     ("job", "mlflow", "registra", True),
-    ("oro", "api", "solo lectura", False, [(1700, 200), (1700, 900)]),
+    ("oro", "api", "SQL warehouse", False, [(1700, 200), (1700, 900)]),
     ("api", "endpoints", "", False),
     ("api", "logs", "", True),
     ("equipo", "gitfolder", "git push / pull", False),

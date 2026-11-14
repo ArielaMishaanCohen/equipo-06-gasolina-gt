@@ -18,15 +18,15 @@ en un Droplet de DigitalOcean.
 Editable en [app.diagrams.net](https://app.diagrams.net) con `docs/arquitectura.drawio`; se regenera con `python scripts/generar_arquitectura.py`. Resumen en texto:
 
 ```
-s3://cc3105-raw-…/img/  ──►  BRONCE  s3://cc3105-cusn-…/equipo6/   bronze.fotos_precios (Auto Loader, incremental)
+Volume crudos/fotos/  ──►  BRONCE  workspace.equipo6_bronze   bronze.fotos_precios (Auto Loader, incremental)
  (fotos del catedrático)       │
                                ▼  OCR + 5 reglas de calidad + MERGE
-                             PLATA   s3://cc3105-ag-…/equipo6/     silver.precios, silver.precios_rejected
+                             PLATA   workspace.equipo6_silver   silver.precios, silver.precios_rejected
                                │
                                ▼  semana martes-lunes, variación, features, modelo (MLflow)
-                             ORO     s3://cc3105-au-…/equipo6/     gold.precio_semanal, variacion_semanal,
-                               │                                   features_modelo, predicciones, metricas_modelo
-                               ▼  deltalake (credenciales de solo lectura)
+                             ORO     workspace.equipo6_gold     gold.precio_semanal, variacion_semanal,
+                               │                                features_modelo, predicciones, metricas_modelo
+                               ▼  SQL warehouse (token de Databricks en el .env del servidor)
                              API FastAPI en el Droplet (uv) ◄── usuario (HTTP) · equipo (SSH) · GitHub Actions (CD)
 ```
 
