@@ -90,4 +90,5 @@ def test_unir_predicciones_llena_direccion_real():
     var = pd.DataFrame([{"semana_inicio": sem, "combustible": "super", "direccion": "sube"}])
     todo = M.unir_predicciones(viejas, nuevas, var)
     assert len(todo) == 2
-    assert todo.iloc[0]["direccion_real"] == "sube" and todo.iloc[1]["direccion_real"] is None
+    assert todo.iloc[0]["direccion_real"] == "sube"
+    assert todo.iloc[1]["direccion_real"] is None
