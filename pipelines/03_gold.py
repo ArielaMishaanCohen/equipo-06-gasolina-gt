@@ -192,7 +192,11 @@ else:
     print(f"⚠️ No existe {T_MEM}: precio_semanal sin filas del MEM (corre 02_silver).")
     mem_sem = spark.createDataFrame([], ESQ_PRECIO)
 
-precio_semanal = fotos_sem.unionByName(mem_sem).orderBy("fuente", "semana_inicio", "combustible").cache()
+precio_semanal = fotos_sem.unionByName(mem_sem).orderBy("fuente", "semana_inicio", "combustible")
+try:  # en serverless no hay cache(); el resultado es el mismo
+    precio_semanal = precio_semanal.cache()
+except Exception:
+    pass
 print("precio_semanal:", precio_semanal.groupBy("fuente").count().collect())
 
 # COMMAND ----------
@@ -503,9 +507,9 @@ else:
 met_pd["_dia"] = pd.to_datetime(met_pd["fecha_entrenamiento"]).dt.date
 met_pd = met_pd.drop_duplicates(["_dia", "modelo", "version_modelo"], keep="last").drop(columns="_dia")
 
-predicciones = a_spark(historico, ESQ_PRED).cache()
-metricas_modelo = a_spark(met_pd, ESQ_MET).cache()
-predicciones.count(), metricas_modelo.count()  # materializa antes de sobrescribir las tablas
+# Se construyen desde pandas (datos locales), así que sobrescribir las tablas leídas es seguro.
+predicciones = a_spark(historico, ESQ_PRED)
+metricas_modelo = a_spark(met_pd, ESQ_MET)
 
 guardar_oro(predicciones,
             "predicciones",

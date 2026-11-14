@@ -130,12 +130,31 @@ print(f"Versión: {VERSION_MODELO} | motor: {MOTOR} | preproc: {PREPROC}")
 print(f"Fotos pendientes: {pendientes.count()} | reprocesar: {REPROCESAR}")
 
 # Limitar bytes por lote Arrow: las fotos HEIC pueden pesar varios MB.
-spark.conf.set("spark.sql.execution.arrow.maxRecordsPerBatch", "4")
+# (En serverless esta configuración no se puede cambiar: se usa la de la plataforma.)
+try:
+    spark.conf.set("spark.sql.execution.arrow.maxRecordsPerBatch", "4")
+except Exception as e:
+    print(f"(arrow.maxRecordsPerBatch no configurable aquí: {str(e).splitlines()[0][:80]})")
+
+
+def cachear(df):
+    """cache() si el cómputo lo permite; en serverless no está disponible y no hace falta."""
+    try:
+        return df.cache()
+    except Exception:
+        return df
+
+
 ESQUEMA_RESULTADOS = "foto_origen string, resultado_json string"
 extraer_particion = partial(extraer_lote, motor=MOTOR, preproc=PREPROC,
                            version_modelo=VERSION_MODELO)
-extraidas = pendientes.mapInPandas(extraer_particion, ESQUEMA_RESULTADOS).cache()
-print(f"Fotos extraídas: {extraidas.count()}")  # materializa OCR antes de las demás acciones
+# El OCR se materializa en una tabla de la corrida (no basta con cache(): en serverless no existe
+# y, sin materializar, "pendientes" se recalcularía vacío después del MERGE).
+T_EXTRACCION = f"{SILVER}._extraccion_corrida"
+(pendientes.mapInPandas(extraer_particion, ESQUEMA_RESULTADOS)
+ .write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(T_EXTRACCION))
+extraidas = spark.table(T_EXTRACCION)
+print(f"Fotos extraídas: {extraidas.count()}")
 
 ESQUEMA_CANDIDATOS = StructType([
     StructField("fecha", DateType()), StructField("combustible", StringType()),
@@ -144,7 +163,7 @@ ESQUEMA_CANDIDATOS = StructType([
     StructField("confianza", DoubleType()), StructField("motor", StringType()),
     StructField("version_modelo", StringType()),
 ])
-candidatos = extraidas.mapInPandas(candidatos_lote, ESQUEMA_CANDIDATOS).cache()
+candidatos = cachear(extraidas.mapInPandas(candidatos_lote, ESQUEMA_CANDIDATOS))
 print(f"Lecturas candidatas (incluye testigos sin precios): {candidatos.count()}")
 display(candidatos)
 
@@ -277,8 +296,8 @@ candidatos_t = (
         "ubicacion", "foto_origen", F.expr("try_cast(confianza as double)").alias("confianza"),
         "motor", "version_modelo")
     .withColumn("_procesado_en", F.current_timestamp())
-    .cache()
 )
+candidatos_t = cachear(candidatos_t)
 fotos_procesadas = candidatos_t.select("foto_origen").distinct().count()
 n_candidatos = candidatos_t.count()
 print(f"Fotos procesadas: {fotos_procesadas} | lecturas candidatas: {n_candidatos}")
@@ -290,7 +309,7 @@ print(f"Fotos procesadas: {fotos_procesadas} | lecturas candidatas: {n_candidato
 # COMMAND ----------
 
 validos, rechazados = calidad.aplicar_reglas_spark(candidatos_t)  # hoy, rango y confianza: config.yaml
-validos, rechazados = validos.cache(), rechazados.cache()
+validos, rechazados = cachear(validos), cachear(rechazados)
 n_validos, n_rechazados = validos.count(), rechazados.count()
 print(f"Válidos: {n_validos} | rechazados: {n_rechazados}")
 
@@ -313,8 +332,8 @@ validos_unicos = (
     .select(
         "fecha", "combustible", F.expr("try_cast(precio_q_galon as decimal(6,2))").alias("precio_q_galon"),
         "modalidad", "ubicacion", "foto_origen", "confianza", "motor", "version_modelo", "_procesado_en")
-    .cache()
 )
+validos_unicos = cachear(validos_unicos)
 n_duplicados_corrida = n_validos - validos_unicos.count()
 validos_unicos.createOrReplaceTempView("validos_a_cargar")
 
@@ -323,8 +342,8 @@ rechazados_a_cargar = (
         "fecha", "combustible", F.expr("try_cast(precio_q_galon as decimal(6,2))").alias("precio_q_galon"),
         "modalidad", "ubicacion", "foto_origen", "confianza", "motor", "version_modelo",
         "_procesado_en", "regla", "motivo")
-    .cache()
 )
+rechazados_a_cargar = cachear(rechazados_a_cargar)
 candidatos_t.select("foto_origen").distinct().createOrReplaceTempView("fotos_de_la_corrida")
 
 
