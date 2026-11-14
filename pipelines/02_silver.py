@@ -2,9 +2,9 @@
 # MAGIC %md
 # MAGIC # 02_silver — Extracción de precios y reglas de calidad (Fase 2)
 # MAGIC
-# MAGIC **ESQUELETO.** Partes: (1) extracción con OCR — **Modelos**; (2) reglas de calidad, cuarentena
+# MAGIC Partes: (1) extracción con OCR — **Modelos**; (2) reglas de calidad, cuarentena
 # MAGIC y MERGE — **Datos**. Contratos 5.2 y 5.3 de `docs/instructivos/INSTRUCTIVO_GENERAL.md`.
-# MAGIC Las guías de cada rol traen el prompt para implementarlo.
+# MAGIC Guía de ejecución: `docs/instructivos/PERSONA_1_DATABRICKS.md`.
 
 # COMMAND ----------
 
@@ -21,22 +21,167 @@ dbutils.widgets.text("esquema_bronze", "equipo6_bronze")
 dbutils.widgets.text("esquema_silver", "equipo6_silver")
 dbutils.widgets.text("motor", "rapidocr")
 dbutils.widgets.text("preproc", "gris_clahe")
+dbutils.widgets.dropdown("reprocesar", "false", ["false", "true"])
+dbutils.widgets.text("ruta_etiquetas", "")
+dbutils.widgets.text("ruta_reporte_exactitud", "")
 
 CATALOGO = dbutils.widgets.get("catalogo")
 BRONZE = f"{CATALOGO}.{dbutils.widgets.get('esquema_bronze')}"
 SILVER = f"{CATALOGO}.{dbutils.widgets.get('esquema_silver')}"
 MOTOR = dbutils.widgets.get("motor")
 PREPROC = dbutils.widgets.get("preproc")
+REPROCESAR = dbutils.widgets.get("reprocesar") == "true"
+RUTA_ETIQUETAS = dbutils.widgets.get("ruta_etiquetas").strip()
+RUTA_REPORTE = dbutils.widgets.get("ruta_reporte_exactitud").strip().rstrip("/")
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## 1. Extracción (Modelos)
-# MAGIC TODO (guía de Modelos, 4.3):
-# MAGIC - Leer de `bronze.fotos_precios` solo las fotos no procesadas con la `version_modelo` actual.
-# MAGIC - Aplicar `gasolina.extraccion.extraer_precios` a `content` (pandas UDF / mapInPandas).
-# MAGIC - Explotar `registros` a una fila por combustible → DataFrame `candidatos` (columnas de 5.3).
-# MAGIC - Fotos sin registros → cuarentena con `motivo = "sin_precios_legibles"`.
+# MAGIC Se leen los bytes de Bronce con `mapInPandas`. Se omiten fotos que ya figuran en precios
+# MAGIC o cuarentena para el motor y versión actuales. Cambiar `preproc` requiere `reprocesar=true`
+# MAGIC porque el contrato de Plata no almacena el preprocesamiento.
+# MAGIC Las fotos sin registros se conservan como testigos nulos para la cuarentena de Datos.
+
+# COMMAND ----------
+
+import json
+from functools import partial
+
+import pandas as pd
+from pyspark.sql import functions as F
+from pyspark.sql.types import DateType, DoubleType, StringType, StructField, StructType
+
+from gasolina import __version__
+from gasolina.ocr import MOTORES, PREPROCS
+from gasolina.silver_extraccion import (
+    candidatos_lote,
+    comprobar_dependencias,
+    evaluar_resultados,
+    extraer_lote,
+)
+
+if MOTOR not in MOTORES or PREPROC not in PREPROCS:
+    raise ValueError(f"motor/preproc inválidos. Opciones: {MOTORES}, {PREPROCS}")
+
+VERSION_MODELO = __version__
+T_FOTOS = f"{BRONZE}.fotos_precios"
+T_PRECIOS = f"{SILVER}.precios"
+T_RECHAZADOS = f"{SILVER}.precios_rejected"
+for tabla in (T_FOTOS, T_PRECIOS, T_RECHAZADOS):
+    if not spark.catalog.tableExists(tabla):
+        raise RuntimeError(f"No existe {tabla}. Ejecuta 00_setup y 01_bronze con Datos.")
+
+# Prueba real de importación y del motor, primero en driver y luego en un worker.
+dependencias_driver = comprobar_dependencias(MOTOR)
+
+
+def verificar_worker(lotes):
+    from gasolina.silver_extraccion import comprobar_dependencias
+
+    for lote in lotes:
+        if len(lote):
+            yield pd.DataFrame([{"entorno": "worker", "versiones": json.dumps(
+                comprobar_dependencias(MOTOR), ensure_ascii=False)}])
+
+
+dependencias_worker = spark.range(1).mapInPandas(
+    verificar_worker, "entorno string, versiones string").collect()
+display(spark.createDataFrame(
+    [("driver", json.dumps(dependencias_driver)),
+     *[(r.entorno, r.versiones) for r in dependencias_worker]],
+    "entorno string, versiones string"))
+
+# COMMAND ----------
+
+fotos_bronce = spark.table(T_FOTOS).select("path", "content", "fecha_carpeta")
+procesadas = (
+    spark.table(T_PRECIOS).select("foto_origen", "motor", "version_modelo")
+    .unionByName(spark.table(T_RECHAZADOS).select("foto_origen", "motor", "version_modelo"))
+    .filter((F.col("version_modelo") == VERSION_MODELO) & (F.col("motor") == MOTOR))
+    .select(F.col("foto_origen").alias("path")).distinct()
+)
+pendientes = (fotos_bronce if REPROCESAR
+              else fotos_bronce.join(procesadas, "path", "left_anti"))
+print(f"Versión: {VERSION_MODELO} | motor: {MOTOR} | preproc: {PREPROC}")
+print(f"Fotos pendientes: {pendientes.count()} | reprocesar: {REPROCESAR}")
+
+# Limitar bytes por lote Arrow: las fotos HEIC pueden pesar varios MB.
+spark.conf.set("spark.sql.execution.arrow.maxRecordsPerBatch", "4")
+ESQUEMA_RESULTADOS = "foto_origen string, resultado_json string"
+extraer_particion = partial(extraer_lote, motor=MOTOR, preproc=PREPROC,
+                           version_modelo=VERSION_MODELO)
+extraidas = pendientes.mapInPandas(extraer_particion, ESQUEMA_RESULTADOS).cache()
+print(f"Fotos extraídas: {extraidas.count()}")  # materializa OCR antes de las demás acciones
+
+ESQUEMA_CANDIDATOS = StructType([
+    StructField("fecha", DateType()), StructField("combustible", StringType()),
+    StructField("precio_q_galon", DoubleType()), StructField("modalidad", StringType()),
+    StructField("ubicacion", StringType()), StructField("foto_origen", StringType()),
+    StructField("confianza", DoubleType()), StructField("motor", StringType()),
+    StructField("version_modelo", StringType()),
+])
+candidatos = extraidas.mapInPandas(candidatos_lote, ESQUEMA_CANDIDATOS).cache()
+print(f"Lecturas candidatas (incluye testigos sin precios): {candidatos.count()}")
+display(candidatos)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### 1.1 Exactitud frente a revisión manual (sección 4.4)
+# MAGIC
+# MAGIC `ruta_etiquetas`: CSV de Persona 2 en S3 o un Volume, con `foto,combustible,precio_q_galon`.
+# MAGIC Se evalúan todas las fotos etiquetadas, incluso las procesadas en corridas anteriores.
+# MAGIC Se compara la extracción **antes** de calidad con tolerancia estricta `abs(pred-real) < 0.005`.
+# MAGIC `sin_etiqueta` son lecturas adicionales sin verdad manual; no se cuentan como errores.
+# MAGIC `ruta_reporte_exactitud` opcional: carpeta S3 o Volume para guardar resumen y detalle CSV.
+
+# COMMAND ----------
+
+if not RUTA_ETIQUETAS:
+    display(spark.createDataFrame(
+        [("pendiente", "Configura ruta_etiquetas con el CSV revisado por Persona 2")],
+        "estado string, siguiente_paso string"))
+else:
+    etiquetas_df = spark.read.option("header", True).csv(RUTA_ETIQUETAS)
+    requeridas = {"foto", "combustible", "precio_q_galon"}
+    if not requeridas.issubset(etiquetas_df.columns):
+        raise ValueError(f"Faltan columnas en etiquetas.csv: {requeridas - set(etiquetas_df.columns)}")
+    etiquetas = [r.asDict() for r in etiquetas_df.collect()]
+    nombres = sorted({r["foto"].replace("\\", "/").rsplit("/", 1)[-1] for r in etiquetas})
+    fotos_revision = fotos_bronce.filter(F.element_at(F.split("path", "/"), -1).isin(nombres))
+    # Reutilizar la extracción actual; solo ejecutar OCR de las etiquetadas faltantes.
+    faltantes_revision = fotos_revision.join(
+        extraidas.select(F.col("foto_origen").alias("path")), "path", "left_anti")
+    resultados_revision = extraidas.unionByName(
+        faltantes_revision.mapInPandas(extraer_particion, ESQUEMA_RESULTADOS))
+    resumen_exactitud, detalle_exactitud = evaluar_resultados(
+        (r.asDict() for r in resultados_revision.toLocalIterator()), etiquetas)
+    contexto = {"motor": MOTOR, "preproc": PREPROC, "version_modelo": VERSION_MODELO}
+    # Esquemas explícitos: también permiten evaluar si todas las fotos están ausentes
+    # (en ese caso tiempo_ms es NULL para todas las filas).
+    tabla_resumen = spark.createDataFrame([{**resumen_exactitud, **contexto}], """
+        etiquetados long, correctos long, incorrectos long, no_encontrados long,
+        sin_etiqueta long, pct_precios_correctos double, pct_fotos_completas double,
+        tiempo_ms_promedio long, fotos_etiquetadas long, fotos_evaluadas long,
+        fotos_ausentes long, motor string, preproc string, version_modelo string
+    """)
+    tabla_detalle = spark.createDataFrame(detalle_exactitud, """
+        foto string, etiquetados long, correctos long, incorrectos long, no_encontrados long,
+        sin_etiqueta long, pct_precios_correctos double, tiempo_ms long,
+        foto_en_bronce boolean, detalle string
+    """)
+    display(tabla_resumen)
+    display(tabla_detalle)
+    if resumen_exactitud["fotos_evaluadas"] < 20:
+        print("PENDIENTE: se necesitan al menos 20 fotos etiquetadas presentes en Bronce.")
+    if resumen_exactitud["fotos_ausentes"]:
+        print("PENDIENTE: hay fotos etiquetadas ausentes en Bronce; aparecen como no encontradas.")
+    if RUTA_REPORTE:
+        for nombre, tabla in (("resumen", tabla_resumen), ("por_foto", tabla_detalle)):
+            (tabla.coalesce(1).write.mode("overwrite").option("header", True)
+             .csv(f"{RUTA_REPORTE}/{nombre}"))
+        print(f"Reporte guardado en {RUTA_REPORTE} (carpetas con part-*.csv).")
 
 # COMMAND ----------
 
