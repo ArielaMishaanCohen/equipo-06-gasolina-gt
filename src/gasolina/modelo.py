@@ -205,9 +205,10 @@ def unir_predicciones(anteriores: pd.DataFrame | None, nuevas: pd.DataFrame,
     real = variacion[["semana_inicio", "combustible", "direccion"]].copy()
     real["semana_inicio"] = pd.to_datetime(real["semana_inicio"]).dt.date
     real = dict(zip(zip(real["semana_inicio"], real["combustible"]), real["direccion"]))
-    todo["direccion_real"] = [real.get((s, c)) if real.get((s, c)) is not None else d
-                              for s, c, d in zip(todo["semana_objetivo"], todo["combustible"],
-                                                 todo["direccion_real"])]
+    todo["direccion_real"] = pd.Series(
+        [real.get((s, c)) if pd.notna(real.get((s, c))) else (d if pd.notna(d) else None)
+         for s, c, d in zip(todo["semana_objetivo"], todo["combustible"], todo["direccion_real"])],
+        index=todo.index, dtype=object)  # nulo = None (no NaN) en todas las versiones de pandas
     return todo[COLUMNAS_PREDICCIONES].sort_values(["semana_objetivo", "combustible"])
 
 
