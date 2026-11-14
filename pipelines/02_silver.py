@@ -8,7 +8,30 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install ..
+# Instalar el paquete `gasolina` del repo. En un Job con git_source el repo está en una carpeta
+# de solo lectura (pip no puede construir ahí): se copia a /tmp, se construye el wheel en el
+# Volume del equipo (visible para driver y workers) y se instala ese wheel.
+import glob
+import os
+import shutil
+import subprocess
+import sys
+
+_src, _wheels = "/tmp/gasolina-src", "/Volumes/workspace/equipo6_bronze/crudos/_wheels"
+shutil.rmtree(_src, ignore_errors=True)
+shutil.copytree(os.path.abspath(".."), _src, ignore=shutil.ignore_patterns(
+    ".git", ".venv", "tests", "docs", "presentacion", "artifacts_demo", "*.egg-info", "__pycache__"))
+os.makedirs(_wheels, exist_ok=True)
+for _w in glob.glob(f"{_wheels}/gasolina-*.whl"):
+    os.remove(_w)
+subprocess.run([sys.executable, "-m", "pip", "wheel", "--no-deps", "-q", "-w", _wheels, _src],
+               check=True)
+WHEEL_GASOLINA = sorted(glob.glob(f"{_wheels}/gasolina-*.whl"))[-1]
+print(WHEEL_GASOLINA)
+
+# COMMAND ----------
+
+# MAGIC %pip install $WHEEL_GASOLINA
 
 # COMMAND ----------
 
