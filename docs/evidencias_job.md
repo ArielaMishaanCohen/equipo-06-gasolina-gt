@@ -41,6 +41,14 @@ Los notebooks están en `/Shared/Proyecto/Notebooks/Pipeline_entrega_20261115/`.
 El código se instaló como wheel 0.2.0 desde el Volume. Son copias del Workspace:
 el push local posterior no las actualiza automáticamente.
 
+## Capturas
+
+- [Historial de ejecuciones del Job](capturas/10_job_historial.png): dos corridas exitosas y el intento fallido corregido.
+- [Tareas Bronce → Plata → Oro y su duración](capturas/11_job_tareas_duracion.png) (corrida 417806436744272: 38 s, 2 min 25 s y 2 min 20 s).
+- [Programación semanal](capturas/12_job_programacion_alertas1.png) y [alertas por correo](capturas/12_job_programacion_alertas2.png).
+- [Experimento de MLflow](capturas/13_mlflow_experimento.png), [tablas Oro](capturas/14_tablas_oro.png) y [predicciones](capturas/15_predicciones_oro.png).
+- Capturas de la API y el panel: [docs/capturas/](capturas/README.md).
+
 ## API pública
 
 La API está publicada en `http://159.65.111.14:8000` (Swagger en `/docs`) y lee Oro
