@@ -508,7 +508,8 @@ if spark.catalog.tableExists(T_MET):
 else:
     met_pd = met_nuevas
 # Idempotencia: misma versión y mismo modelo el mismo día -> se queda la última corrida
-met_pd["_dia"] = pd.to_datetime(met_pd["fecha_entrenamiento"]).dt.date
+# utc=True: las fechas previas (Spark) y la nueva (UTC) pueden venir con y sin zona horaria
+met_pd["_dia"] = pd.to_datetime(met_pd["fecha_entrenamiento"], utc=True).dt.date
 met_pd = met_pd.drop_duplicates(["_dia", "modelo", "version_modelo"], keep="last").drop(columns="_dia")
 
 # Se construyen desde pandas (datos locales), así que sobrescribir las tablas leídas es seguro.
