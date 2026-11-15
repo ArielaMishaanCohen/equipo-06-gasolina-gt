@@ -18,9 +18,11 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 
-_src, _wheels = "/tmp/gasolina-src", "/Volumes/workspace/equipo6_bronze/crudos/_wheels"
-shutil.rmtree(_src, ignore_errors=True)
+# Carpeta temporal nueva en cada corrida: en serverless /tmp puede traer restos de otra corrida.
+_src = os.path.join(tempfile.mkdtemp(prefix="gasolina-"), "src")
+_wheels = "/Volumes/workspace/equipo6_bronze/crudos/_wheels"
 shutil.copytree(os.path.abspath(".."), _src, ignore=shutil.ignore_patterns(
     ".git", ".venv", "tests", "docs", "presentacion", "artifacts_demo", "*.egg-info", "__pycache__"))
 os.makedirs(_wheels, exist_ok=True)
