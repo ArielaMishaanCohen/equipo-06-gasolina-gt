@@ -384,6 +384,9 @@ from pyspark.sql.types import BooleanType, LongType, TimestampType
 from gasolina import __version__ as VERSION
 from gasolina import modelo
 
+# URIs explícitas: si no, MLflow las busca en spark.conf, que en serverless no se puede leer.
+mlflow.set_tracking_uri("databricks")
+mlflow.set_registry_uri("databricks-uc")
 usuario = spark.sql("SELECT current_user()").first()[0]
 mlflow.set_experiment(f"/Users/{usuario}/equipo06_direccion")
 AHORA = datetime.now(timezone.utc).replace(microsecond=0)
@@ -458,7 +461,6 @@ if final is not None:
                                         signature=infer_signature(ult_X, final.predict(ult_X)))
         run_final = run.info.run_id
     try:
-        mlflow.set_registry_uri("databricks-uc")
         reg = mlflow.register_model(info.model_uri, MODELO_UC)
         print(f"Registrado en Unity Catalog: {MODELO_UC} v{reg.version}")
     except Exception as e:  # sin permiso de crear modelos en UC: queda como modelo de MLflow
