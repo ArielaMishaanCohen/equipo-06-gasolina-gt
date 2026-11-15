@@ -278,8 +278,10 @@ def extraer_precios(
     extra = _segunda_pasada(ocr, img, dets, y_min) if segunda_pasada else []
     todas = [d for d in dets + extra if R.centro(d["bbox"])[1] > y_min]
 
-    pantallas = _filtrar_fila(_agrupar_pantallitas(R.candidatos_precio(todas)))
+    pantallas = _agrupar_pantallitas(R.candidatos_precio(todas))
     tipo = R.clasificar_tipo_foto(dets, len(pantallas))
+    if tipo == "bomba":
+        pantallas = _filtrar_fila(pantallas)
     marca = R.detectar_marca(dets)
     etiquetas = R.etiquetas_combustible(dets)
 

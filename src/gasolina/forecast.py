@@ -1,6 +1,7 @@
-"""Pronóstico semanal de precios (dueño: Modelos).
+"""LEGADO v2: regresión del precio; fuera del alcance de la entrega v3.
 
-ESTADO: STUB. Ver docs/INSTRUCTIVO_GENERAL.md, sección 8.3.2.
+El clasificador requerido está implementado en gasolina.modelo y pipelines/03_gold.py.
+Este módulo se conserva por compatibilidad y no lo consume el pipeline ni la API v3.
 
 Funciones esperadas:
   - baseline_ingenuo(df) -> predicción = precio de la semana actual.
@@ -8,7 +9,7 @@ Funciones esperadas:
   - evaluar(y_real, y_pred) -> {"mae", "rmse", "mape"}.
   - predecir_proxima_semana(modelo, df) -> lista de
       {"combustible", "prediccion", "intervalo_inf", "intervalo_sup"}  (contrato 4.2).
-La API de producción NO usa este módulo: solo lee artifacts/predicciones.json.
+La API v3 lee las tablas Oro mediante gasolina.oro.
 """
 
 from __future__ import annotations

@@ -14,52 +14,81 @@ Métricas (un precio es correcto si |pred - real| < 0.005):
 from __future__ import annotations
 
 import csv
+import math
 import time
+from decimal import Decimal
 from pathlib import Path
 
 TOLERANCIA = 0.005
+COMBUSTIBLES = {"super", "regular", "diesel"}
+
+
+def nombre_foto(ruta: str) -> str:
+    return str(ruta).replace("\\", "/").rsplit("/", 1)[-1]
 
 
 def cargar_etiquetas(ruta: str | Path) -> dict[str, dict[str, dict]]:
     """{foto: {combustible: {"precio": float, "lectura": str}}} (foto = nombre de archivo)."""
     out: dict[str, dict[str, dict]] = {}
-    with open(ruta, newline="", encoding="utf-8") as f:
-        for fila in csv.DictReader(f):
-            foto = Path(fila["foto"]).name
-            out.setdefault(foto, {})[fila["combustible"].strip().lower()] = {
-                "precio": float(fila["precio_q_galon"]),
+    with open(ruta, newline="", encoding="utf-8-sig") as f:
+        lector = csv.DictReader(f)
+        requeridas = {"foto", "combustible", "precio_q_galon"}
+        if not requeridas.issubset(lector.fieldnames or []):
+            raise ValueError("etiquetas.csv requiere foto, combustible y precio_q_galon")
+        for fila in lector:
+            foto = nombre_foto(fila["foto"].strip())
+            combustible = fila["combustible"].strip().lower()
+            precio = float(fila["precio_q_galon"])
+            if not foto or combustible not in COMBUSTIBLES or not math.isfinite(precio):
+                raise ValueError(f"Etiqueta inválida: {fila}")
+            precios = out.setdefault(foto, {})
+            if combustible in precios:
+                raise ValueError(f"Etiqueta duplicada o ambigua: {foto}, {combustible}")
+            precios[combustible] = {
+                "precio": precio,
                 "lectura": (fila.get("lectura") or "a_simple_vista").strip(),
             }
+    if not out:
+        raise ValueError("etiquetas.csv no contiene precios etiquetados")
     return out
 
 
 def comparar(resultados: dict[str, dict], etiquetas: dict[str, dict[str, dict]]) -> dict:
     """resultados: {foto: salida de extraer_precios}. Devuelve métricas globales y por foto."""
     por_foto, tot = [], {"etiquetados": 0, "correctos": 0, "incorrectos": 0,
-                         "no_encontrados": 0, "sin_etiqueta": 0}
+                         "no_encontrados": 0, "sin_etiqueta": 0, "falsos_positivos": 0}
     por_lectura: dict[str, list[int]] = {}
     for foto, verdad in sorted(etiquetas.items()):
         r = resultados.get(foto)
-        pred = {x["combustible"]: x["precio_q_galon"] for x in (r or {}).get("registros", [])}
+        registros = (r or {}).get("registros", [])
+        pred = {}
+        for x in registros:
+            pred.setdefault(x["combustible"], []).append(x["precio_q_galon"])
         detalle = {}
         for c, v in verdad.items():
             tot["etiquetados"] += 1
             if c not in pred:
                 estado = "no_encontrado"
                 tot["no_encontrados"] += 1
-            elif abs(pred[c] - v["precio"]) < TOLERANCIA:
+            elif any(abs(Decimal(str(p)) - Decimal(str(v["precio"])))
+                     < Decimal(str(TOLERANCIA)) for p in pred[c]):
                 estado = "correcto"
                 tot["correctos"] += 1
             else:
-                estado = f"incorrecto ({pred[c]:.2f})"
+                estado = f"incorrecto ({pred[c][0]:.2f})"
                 tot["incorrectos"] += 1
             acc = por_lectura.setdefault(v["lectura"], [0, 0])
             acc[0] += estado == "correcto"
             acc[1] += 1
             detalle[c] = {"real": v["precio"], "estado": estado}
         extra = sorted(set(pred) - set(verdad))
-        tot["sin_etiqueta"] += len(extra)
+        tot["sin_etiqueta"] += sum(len(pred[c]) for c in extra)
+        # El contrato actual etiqueta un precio por combustible/foto. Las salidas
+        # duplicadas para esa llave sí son falsos positivos; lo no anotado es desconocido.
+        falsos = sum(max(0, len(pred.get(c, [])) - 1) for c in verdad)
+        tot["falsos_positivos"] += falsos
         por_foto.append({"foto": foto, "detalle": detalle, "sin_etiqueta": extra,
+                         "falsos_positivos": falsos,
                          "tiempo_ms": (r or {}).get("tiempo_ms")})
     n = tot["etiquetados"] or 1
     tiempos = [f["tiempo_ms"] for f in por_foto if f["tiempo_ms"] is not None]
@@ -83,7 +112,14 @@ def evaluar_carpeta(etiquetas_csv: str | Path, imagenes: str | Path, **kwargs) -
     from gasolina.extraccion import extraer_precios
 
     etiquetas = cargar_etiquetas(etiquetas_csv)
-    rutas = {p.name: p for p in Path(imagenes).rglob("*") if p.name in etiquetas}
+    if not Path(imagenes).is_dir():
+        raise ValueError(f"No existe la carpeta de imágenes: {imagenes}")
+    rutas = {}
+    for p in Path(imagenes).rglob("*"):
+        if p.is_file() and p.name in etiquetas:
+            if p.name in rutas:
+                raise ValueError(f"Nombre de foto ambiguo: {p.name}")
+            rutas[p.name] = p
     t0 = time.perf_counter()
     resultados = {foto: extraer_precios(ruta, **kwargs) for foto, ruta in sorted(rutas.items())}
     out = comparar(resultados, etiquetas)
@@ -92,3 +128,28 @@ def evaluar_carpeta(etiquetas_csv: str | Path, imagenes: str | Path, **kwargs) -
     out["metricas"]["segundos_total"] = round(time.perf_counter() - t0, 1)
     out["parametros"] = {k: v for k, v in kwargs.items()}
     return out
+
+
+def elegir_configuracion(resultados: list[dict], min_fotos: int = 20) -> dict:
+    """Mayor exactitud, luego fotos completas, menos falsos positivos y menor latencia.
+
+    Solo admite corridas completas sobre el mismo conjunto de etiquetas. No declarar
+    ganador cuando faltan fotos o hay menos de las requeridas para la revisión manual.
+    """
+    if not resultados:
+        raise ValueError("No hay experimentos OCR para comparar")
+    referencias = {tuple(sorted(f["foto"] for f in r["por_foto"])) for r in resultados}
+    if len(referencias) != 1:
+        raise ValueError("Los experimentos deben usar las mismas fotos etiquetadas")
+    if len(next(iter(referencias))) < min_fotos:
+        raise ValueError(f"Se requieren al menos {min_fotos} fotos etiquetadas")
+    if any(r["metricas"].get("fotos_no_encontradas")
+           or r["metricas"].get("fotos_ausentes", 0) for r in resultados):
+        raise ValueError("Faltan fotos etiquetadas: no se puede elegir una configuración")
+
+    def orden(r):
+        m = r["metricas"]
+        return (m["pct_precios_correctos"], m["pct_fotos_completas"],
+                -m.get("falsos_positivos", 0), -(m.get("tiempo_ms_promedio") or float("inf")))
+
+    return max(resultados, key=orden)
