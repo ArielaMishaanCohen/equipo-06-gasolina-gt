@@ -8,6 +8,7 @@ datos/
 *.HEIC
 *.png
 !docs/arquitectura.png
+!docs/capturas/*.png
 !src/gasolina/api/static/*.png
 
 # Secretos

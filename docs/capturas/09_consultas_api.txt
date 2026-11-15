@@ -1,0 +1,176 @@
+
+=== Estado del servicio
+GET http://159.65.111.14:8000/health
+{
+    "status": "ok",
+    "version": "0.2.0",
+    "fuente_oro": "databricks",
+    "tablas": {
+        "precio_semanal": {
+            "fuente": "databricks",
+            "filas": 345,
+            "ultima": "2026-11-03"
+        },
+        "variacion_semanal": {
+            "fuente": "databricks",
+            "filas": 264,
+            "ultima": "2026-11-03"
+        },
+        "features_modelo": {
+            "fuente": "databricks",
+            "filas": 264,
+            "ultima": "2026-11-03"
+        },
+        "predicciones": {
+            "fuente": "databricks",
+            "filas": 3,
+            "ultima": "2026-11-10"
+        },
+        "metricas_modelo": {
+            "fuente": "databricks",
+            "filas": 3,
+            "ultima": "2026-11-15"
+        }
+    },
+    "entorno": "servidor",
+    "hora_servidor": "2026-11-15T17:28:31-06:00"
+}
+-> HTTP 200
+
+=== Precio actual por combustible
+GET http://159.65.111.14:8000/precios/actual
+{
+    "semana_inicio": "2026-11-03",
+    "precios": [
+        {
+            "combustible": "diesel",
+            "semana_inicio": "2026-11-03",
+            "semana_fin": "2026-11-09",
+            "precio_promedio": 40.69,
+            "precio_min": 40.69,
+            "precio_max": 40.69,
+            "fuente": "fotos"
+        },
+        {
+            "combustible": "regular",
+            "semana_inicio": "2026-11-03",
+            "semana_fin": "2026-11-09",
+            "precio_promedio": 29.69,
+            "precio_min": 29.69,
+            "precio_max": 29.69,
+            "fuente": "fotos"
+        },
+        {
+            "combustible": "super",
+            "semana_inicio": "2026-11-03",
+            "semana_fin": "2026-11-09",
+            "precio_promedio": 32.19,
+            "precio_min": 32.19,
+            "precio_max": 32.19,
+            "fuente": "fotos"
+        }
+    ]
+}
+-> HTTP 200
+
+=== Predicción de la semana siguiente: super
+GET http://159.65.111.14:8000/prediccion?combustible=super
+{
+    "semana": "2026-11-10",
+    "combustible": "super",
+    "prediccion": "baja",
+    "probabilidad": 0.8139,
+    "prediccion_baseline": null,
+    "modelo": "regresion_logistica",
+    "version_modelo": "0.2.0"
+}
+-> HTTP 200
+
+=== Predicción de la semana siguiente: regular
+GET http://159.65.111.14:8000/prediccion?combustible=regular
+{
+    "semana": "2026-11-10",
+    "combustible": "regular",
+    "prediccion": "baja",
+    "probabilidad": 0.8613,
+    "prediccion_baseline": null,
+    "modelo": "regresion_logistica",
+    "version_modelo": "0.2.0"
+}
+-> HTTP 200
+
+=== Predicción de la semana siguiente: diesel
+GET http://159.65.111.14:8000/prediccion?combustible=diesel
+{
+    "semana": "2026-11-10",
+    "combustible": "diesel",
+    "prediccion": "baja",
+    "probabilidad": 0.8908,
+    "prediccion_baseline": null,
+    "modelo": "regresion_logistica",
+    "version_modelo": "0.2.0"
+}
+-> HTTP 200
+
+=== Histórico de diésel (oct-nov 2026, máximo 10)
+GET http://159.65.111.14:8000/precios?combustible=diesel&desde=2026-10-01&hasta=2026-11-30&limit=10
+{
+    "total": 7,
+    "limit": 10,
+    "offset": 0,
+    "datos": [
+        {
+            "semana_inicio": "2026-10-06",
+            "semana_fin": "2026-10-12",
+            "combustible": "diesel",
+            "precio_promedio": 41.69,
+            "precio_min": 41.69,
+            "precio_max": 41.69,
+            "n_registros": 1,
+            "fuente": "mem",
+            "dif_q": -0.02,
+            "dif_pct": -0.05,
+            "direccion": "se_mantiene"
+        },
+        {
+            "semana_inicio": "2026-10-13",
+            "semana_fin": "2026-10-19",
+            "combustible": "diesel",
+            "precio_promedio": 42.44,
+            "precio_min": 41.69,
+            "precio_max": 43.19,
+            "n_registros": 2,
+            "fuente": "fotos",
+            "dif_q": null,
+            "dif_pct": null,
+            "direccion": null
+        },
+        {
+            "semana_inicio": "2026-10-20",
+            "semana_fin": "2026-10-26",
+            "combustible": "diesel",
+            "precio_promedio": 42.69,
+            "precio_min": 42.69,
+            "precio_max": 42.69,
+            "n_registros": 1,
+            "fuente": "fotos",
+-> HTTP 200
+
+=== Métricas del modelo vs. línea base
+GET http://159.65.111.14:8000/modelo/metricas
+{
+    "fecha_entrenamiento": "2026-11-15",
+    "modelo": "regresion_logistica",
+    "version_modelo": "0.2.0",
+    "accuracy_modelo": 0.6,
+    "accuracy_baseline": 0.5,
+    "f1_macro_modelo": 0.313,
+    "f1_macro_baseline": 0.2564,
+    "n_semanas_test": 10,
+    "supera_baseline": true,
+    "mlflow_run_id": "826b0bb0449e4e7ba1b19632926065dc",
+    "es_champion": true
+}
+-> HTTP 200
+
+✅ Todas las consultas respondieron 200
