@@ -18,9 +18,11 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 
-_src, _wheels = "/tmp/gasolina-src", "/Volumes/workspace/equipo6_bronze/crudos/_wheels"
-shutil.rmtree(_src, ignore_errors=True)
+# Carpeta temporal nueva en cada corrida: en serverless /tmp puede traer restos de otra corrida.
+_src = os.path.join(tempfile.mkdtemp(prefix="gasolina-"), "src")
+_wheels = "/Volumes/workspace/equipo6_bronze/crudos/_wheels"
 shutil.copytree(os.path.abspath(".."), _src, ignore=shutil.ignore_patterns(
     ".git", ".venv", "tests", "docs", "presentacion", "artifacts_demo", "*.egg-info", "__pycache__"))
 os.makedirs(_wheels, exist_ok=True)
@@ -384,6 +386,9 @@ from pyspark.sql.types import BooleanType, LongType, TimestampType
 from gasolina import __version__ as VERSION
 from gasolina import modelo
 
+# URIs explícitas: si no, MLflow las busca en spark.conf, que en serverless no se puede leer.
+mlflow.set_tracking_uri("databricks")
+mlflow.set_registry_uri("databricks-uc")
 usuario = spark.sql("SELECT current_user()").first()[0]
 mlflow.set_experiment(f"/Users/{usuario}/equipo06_direccion")
 AHORA = datetime.now(timezone.utc).replace(microsecond=0)
@@ -458,7 +463,6 @@ if final is not None:
                                         signature=infer_signature(ult_X, final.predict(ult_X)))
         run_final = run.info.run_id
     try:
-        mlflow.set_registry_uri("databricks-uc")
         reg = mlflow.register_model(info.model_uri, MODELO_UC)
         print(f"Registrado en Unity Catalog: {MODELO_UC} v{reg.version}")
     except Exception as e:  # sin permiso de crear modelos en UC: queda como modelo de MLflow
@@ -504,7 +508,8 @@ if spark.catalog.tableExists(T_MET):
 else:
     met_pd = met_nuevas
 # Idempotencia: misma versión y mismo modelo el mismo día -> se queda la última corrida
-met_pd["_dia"] = pd.to_datetime(met_pd["fecha_entrenamiento"]).dt.date
+# utc=True: las fechas previas (Spark) y la nueva (UTC) pueden venir con y sin zona horaria
+met_pd["_dia"] = pd.to_datetime(met_pd["fecha_entrenamiento"], utc=True).dt.date
 met_pd = met_pd.drop_duplicates(["_dia", "modelo", "version_modelo"], keep="last").drop(columns="_dia")
 
 # Se construyen desde pandas (datos locales), así que sobrescribir las tablas leídas es seguro.

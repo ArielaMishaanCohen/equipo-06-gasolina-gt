@@ -92,3 +92,16 @@ def test_unir_predicciones_llena_direccion_real():
     assert len(todo) == 2
     assert todo.iloc[0]["direccion_real"] == "sube"
     assert todo.iloc[1]["direccion_real"] is None
+
+
+def test_predice_la_ultima_semana_aunque_falte_direccion_actual():
+    df = _features()
+    ultima = df["semana_inicio"].max()
+    df.loc[df["semana_inicio"] == ultima, ["direccion_actual", "var_q_1"]] = None  # hueco del MEM
+    comp = M.entrenar_y_comparar(df)
+    mod = M.reentrenar_con_todo(df, "regresion_logistica")
+    pred = M.predecir(df, "regresion_logistica", mod, "0.3.0")
+    assert len(pred) == 3
+    assert (pred["semana_objetivo"] == ultima + timedelta(days=7)).all()
+    assert set(pred["prediccion"]) <= set(M.CLASES) and pred["prediccion_baseline"].isna().all()
+    assert comp.n_prueba == 30
