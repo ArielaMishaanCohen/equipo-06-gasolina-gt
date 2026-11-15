@@ -50,7 +50,7 @@ extraccion:
   preproc: gris_clahe
 
 api:
-  puerto: 8006                             # 80XX del equipo (confirmar)
+  puerto: 8000                             # 80XX del equipo (confirmar)
   limit_default: 100
   limit_max: 1000
   oro_ttl_segundos: 300                    # cada cuánto se vuelven a leer las tablas Oro

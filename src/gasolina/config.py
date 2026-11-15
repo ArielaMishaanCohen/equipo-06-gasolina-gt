@@ -39,7 +39,7 @@ DEFAULTS: dict = {
     "calidad": {"rango_precio": {"min": 20.0, "max": 60.0}, "confianza_minima": 0.5},
     "direccion": {"umbral_q": 0.10, "clases": ["sube", "baja", "se_mantiene"]},
     "extraccion": {"motor": "rapidocr", "preproc": "gris_clahe"},
-    "api": {"puerto": 8006, "limit_default": 100, "limit_max": 1000, "oro_ttl_segundos": 300,
+    "api": {"puerto": 8000, "limit_default": 100, "limit_max": 1000, "oro_ttl_segundos": 300,
             "zona_horaria_utc": -6},
 }
 

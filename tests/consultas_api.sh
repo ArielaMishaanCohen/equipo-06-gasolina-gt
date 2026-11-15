@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Prueba de usuario final: precio actual y predicción de super, regular y diésel.
-# Uso:  BASE_URL=http://159.65.111.14:8006 bash tests/consultas_api.sh
-#       (por defecto http://localhost:8006)
+# Uso:  BASE_URL=http://159.65.111.14:8000 bash tests/consultas_api.sh
+#       (por defecto http://localhost:8000)
 set -u
-BASE_URL="${BASE_URL:-http://localhost:8006}"
+BASE_URL="${BASE_URL:-http://localhost:8000}"
 FALLAS=0
 
 consulta() {

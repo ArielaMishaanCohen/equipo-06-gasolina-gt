@@ -146,15 +146,17 @@ def _normalizar(df: pd.DataFrame) -> pd.DataFrame:
     """Fechas como date y números como float (la fuente "databricks" devuelve texto)."""
     df = df.copy()
     for col in df.columns:
+        # pandas 3 usa el dtype "str" (no object) para texto: tratar ambos igual.
+        texto = pd.api.types.is_object_dtype(df[col]) or pd.api.types.is_string_dtype(df[col])
         if col.startswith(("semana_", "fecha")) and col != "fecha_generacion":
             df[col] = pd.to_datetime(df[col], errors="coerce").dt.date
         elif col == "fecha_generacion":
             df[col] = pd.to_datetime(df[col], errors="coerce")
-        elif df[col].dtype == object and set(df[col].dropna().astype(str).str.lower()) <= {
+        elif texto and set(df[col].dropna().astype(str).str.lower()) <= {
             "true", "false"} and df[col].notna().any():
             df[col] = df[col].astype(str).str.lower().map({"true": True, "false": False})
-        elif df[col].dtype == object and col not in ("version_modelo", "mlflow_run_id"):
-            conv = pd.to_numeric(df[col], errors="coerce")
+        elif texto and col not in ("version_modelo", "mlflow_run_id"):
+            conv = pd.to_numeric(df[col].astype(object), errors="coerce")
             if conv.notna().sum() == df[col].notna().sum() and df[col].notna().any():
                 df[col] = conv
     return df

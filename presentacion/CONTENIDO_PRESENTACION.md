@@ -93,7 +93,7 @@ Fotos + histórico MEM + WTI + eventos de subsidio
 
 Job: ejecuta Bronce → Plata → Oro
 MLflow: conserva experimentos, métricas y modelos
-SSH: acceso de la responsable al servidor de la API
+Droplet: API pública en http://159.65.111.14:8000
 ```
 
 **Notas para exponer**
@@ -106,7 +106,7 @@ y genera los resultados del modelo. La API permite consultarlos sin abrir un not
 están en un Volume de Unity Catalog. La lectura implementada para la API usa SQL
 warehouse. Si el diagrama anterior muestra escritura a buckets externos, ajustar
 esa parte al estado real antes de usarlo: las ubicaciones S3 disponibles son de
-solo lectura y la alternativa requiere confirmación del catedrático.
+solo lectura y el catedrático aprobó el 13/11 el workspace propio con lectura por SQL warehouse.
 
 ### Diapositiva 3. Conservamos las fotos y medimos con referencias manuales
 
@@ -323,11 +323,11 @@ automáticamente.
 | Diésel | 10/11/2026 | Baja | 0.8908 |
 
 **Visual**: una respuesta real de `/prediccion` y un QR a
-`http://159.65.111.14:8006/docs`. Probar ese destino desde un teléfono antes de
+`http://159.65.111.14:8000/docs`. Probar ese destino desde un teléfono antes de
 publicar la presentación. Se puede cambiar el destino a la consulta directa
-`http://159.65.111.14:8006/prediccion?combustible=super` si resulta más claro.
+`http://159.65.111.14:8000/prediccion?combustible=super` si resulta más claro.
 
-**Estado al corte**: despliegue público pendiente de la responsable de SSH.
+**Estado al corte**: API pública en `http://159.65.111.14:8000`, `/health` con `fuente_oro=databricks`.
 Mantener ese aviso hasta comprobar acceso externo. Los siete HTTP 200 fueron
 pruebas locales de FastAPI conectadas a las tablas reales de Databricks.
 
@@ -358,16 +358,13 @@ semana del 17. No cambiar solamente la fecha en la diapositiva o en la respuesta
 “Construimos y verificamos el recorrido desde fotos hasta resultados consultables.
 Los límites principales siguen siendo los errores de lectura y la baja cobertura
 de estabilidad del clasificador. El siguiente paso es reunir más observaciones,
-evaluar semanas futuras y completar la publicación de la API.”
-
-Si el despliegue y el permiso de almacenamiento siguen pendientes, decirlo en la
-exposición. Si se resuelven, actualizar la diapositiva con evidencia nueva.
+evaluar semanas futuras e incorporar la semana del 10 de noviembre para predecir el 17.”
 
 ## 3. Demostración de cinco minutos
 
 ### Preparación antes de exponer
 
-- Responsable de SSH: seguir [la guía de despliegue](../docs/DESPLIEGUE_PARA_RESPONSABLE_SSH.md).
+- Ariela: actualizar el servidor con [la guía de despliegue](../docs/DESPLIEGUE.md).
 - Comprobar el servicio desde otra red y verificar `fuente_oro=databricks` en `/health`.
 - Abrir previamente Job, historial, tablas necesarias y documentación `/docs`.
 - Comprobar el QR con el teléfono. No publicar tokens ni archivos `.env` en pantalla.
@@ -396,7 +393,7 @@ captura previa como resultado de la ejecución recién lanzada.
 Abrir en navegador, o ejecutar lo siguiente en Bash:
 
 ```bash
-BASE_URL=http://159.65.111.14:8006
+BASE_URL=http://159.65.111.14:8000
 curl --fail --max-time 30 "$BASE_URL/health"
 curl --fail --max-time 30 "$BASE_URL/precios/actual"
 curl --fail --max-time 30 "$BASE_URL/prediccion?combustible=super"
@@ -409,7 +406,7 @@ curl --fail --max-time 30 "$BASE_URL/modelo/metricas"
 La suite equivalente está en [tests/consultas_api.sh](../tests/consultas_api.sh):
 
 ```bash
-BASE_URL=http://159.65.111.14:8006 bash tests/consultas_api.sh
+BASE_URL=http://159.65.111.14:8000 bash tests/consultas_api.sh
 ```
 
 ### Plan B
@@ -480,8 +477,8 @@ para validación con rutas y esquemas aislados, mediante `batch_merge`.
 **¿Dónde están las tablas y por qué no leen directamente de S3?**
 
 Son tablas gestionadas de Unity Catalog. Las ubicaciones S3 del curso están marcadas
-como solo lectura. La API implementa consulta por SQL warehouse. La aceptación de
-esta alternativa o una ubicación externa con escritura debe coordinarse con el catedrático.
+como solo lectura. La API implementa consulta por SQL warehouse. El catedrático aprobó
+esta alternativa el 13 de noviembre (workspace propio del equipo).
 
 **¿Qué ocurre si el pipeline falla?**
 
@@ -508,7 +505,7 @@ un costo solo de esos tiempos ni inventar nodos o workers en serverless.
 | [Evidencias del Job](../docs/evidencias_job.md) | Alcance, ejecuciones, conteos y corrección del fallo |
 | [Datos del Job](../docs/evidencias_job.json) | Cifras estructuradas para tablas y gráficos |
 | [Nota de cómputo](../docs/nota_clusters.md) | Entorno serverless y diferencias frente a clusters clásicos |
-| [Guía SSH](../docs/DESPLIEGUE_PARA_RESPONSABLE_SSH.md) | Despliegue y comprobación pública pendientes al corte |
+| [Guía SSH](../docs/DESPLIEGUE.md) | Actualización y comprobación del servidor |
 | [Instructivo general, sección 11.3](../docs/instructivos/INSTRUCTIVO_GENERAL.md) | Orden, tiempos y requisitos del jurado |
 
 ### Enlaces de Databricks
@@ -537,9 +534,9 @@ para recrear los gráficos principales.
 | --- | --- | --- |
 | OCR y modelos | Corridas reales completadas | Conservar cifras o reemplazar solo con nueva evidencia |
 | Job | Dos validaciones completas SUCCESS | Preparar historial y ensayo de demo |
-| API con datos reales | Siete consultas locales HTTP 200 | Comprobar publicación externa por la responsable de SSH |
-| URL y QR | Dirección prevista, sin publicación verificada | Probar desde otra red y desde un teléfono |
-| S3 externo | Ubicaciones disponibles de solo lectura | Confirmar SQL o conseguir una ubicación autorizada |
+| API con datos reales | Pública en :8000, `fuente_oro=databricks` | Volver a comprobar el día de la presentación |
+| URL y QR | `http://159.65.111.14:8000/docs` responde | Probar desde un teléfono |
+| S3 externo | Ubicaciones de solo lectura; SQL warehouse aprobado el 13/11 | Ninguna |
 | Predicción | Objetivo 10/11/2026 | Mantener la fecha mientras no cambie el histórico |
 | Capturas y grabación | Enlaces de evidencia disponibles; grabación no creada | Guardar material de respaldo real |
 | Exposición | Reparto sugerido | Ajustar responsables y ensayar los diez minutos |
@@ -566,10 +563,10 @@ Incluye los seis integrantes y permite ajustar el reparto de exposición.
 Presenta OCR y clasificación como evaluaciones distintas, con sus denominadores.
 Usa los valores exactos de las tablas para gráficos y conserva las notas de limitaciones.
 La predicción disponible corresponde al 10 de noviembre de 2026.
-Identifica como pendientes la publicación externa de la API y el acuerdo sobre S3
-mientras no se aporte nueva evidencia de que se resolvieron.
+La API está publicada en http://159.65.111.14:8000 y el catedrático aprobó la lectura
+de Oro por SQL warehouse.
 No inventes resultados, capturas, matrices de confusión, costos ni un despliegue exitoso.
-El QR debe apuntar a una URL probada; si sigue pendiente, indícalo.
+El QR apunta a http://159.65.111.14:8000/docs.
 Las preguntas probables y los detalles de implementación van en notas o apéndice,
 no como párrafos extensos en las diez diapositivas principales.
 ```

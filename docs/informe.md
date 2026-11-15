@@ -79,9 +79,9 @@ La validación local obtuvo 143 pruebas aprobadas y una omitida por ausencia de 
 
 ## 5. API, alcance y lecciones
 
-FastAPI implementa health, precios actuales, histórico con filtros y paginación, predicción por combustible y métricas del modelo. La documentación está disponible en /docs. El servidor utiliza uv con pyproject.toml y uv.lock. El despliegue previsto conserva el proceso al cerrar SSH y lo reinicia mediante cron. Las credenciales se configuran en un archivo privado .env.
+FastAPI implementa health, precios actuales, histórico con filtros y paginación, predicción por combustible y métricas del modelo. La documentación está disponible en /docs. El servidor utiliza uv con pyproject.toml y uv.lock. El despliegue conserva el proceso al cerrar SSH y lo reinicia mediante cron. Las credenciales se configuran en un archivo privado .env.
 
-Se probaron siete casos de consulta de la API desde este entorno contra las tablas reales. Todos respondieron HTTP 200 y health confirmó fuente_oro=databricks. La comprobación pública no obtuvo respuesta en el puerto 8006. La integrante responsable de SSH ejecutará el despliegue y las consultas externas. Se entrega una guía para configurar el SQL warehouse y comprobar el servicio publicado.
+Se probaron siete casos de consulta de la API desde este entorno contra las tablas reales. Todos respondieron HTTP 200 y health confirmó fuente_oro=databricks. La API está publicada en el Droplet del curso, en http://159.65.111.14:8000, y su documentación interactiva en /docs. Desde una red externa, health responde fuente_oro=databricks con las cinco tablas de Oro. El proceso se despliega con scripts/deploy.sh en modo venv, sigue activo al cerrar SSH y se reinicia con @reboot en cron.
 
 | Combustible | Semana objetivo | Predicción | Probabilidad |
 | --- | --- | --- | --- |
@@ -91,7 +91,7 @@ Se probaron siete casos de consulta de la API desde este entorno contra las tabl
 
 La última semana del histórico comienza el 3 de noviembre, por lo que la predicción disponible corresponde al 10. El equipo indicó que no contará con datos de esa semana para generar la predicción del 17. La fecha objetivo se conserva según los datos disponibles.
 
-Las tablas gestionadas permiten trabajar con la infraestructura disponible. Para publicar tablas externas en otro bucket S3 hace falta una ruta con escritura y una external location autorizada. Las tablas externas no pueden superponerse al almacenamiento gestionado de Unity Catalog. El equipo debe confirmar con el catedrático si acepta la lectura por SQL warehouse frente al requisito original de S3 directo.
+Las tablas gestionadas permiten trabajar con la infraestructura disponible. Para publicar tablas externas en otro bucket S3 hace falta una ruta con escritura y una external location autorizada. Las tablas externas no pueden superponerse al almacenamiento gestionado de Unity Catalog. El 13 de noviembre el catedrático aprobó trabajar en el workspace propio del equipo con tablas gestionadas y que la API lea Oro mediante el SQL warehouse.
 
 Las principales lecciones fueron conservar las fotos y su trazabilidad, medir la extracción con etiquetas, separar temporalmente entrenamiento y prueba y revisar F1 además de accuracy. También se comprobó que aumentar la resolución puede elevar el consumo de memoria sin mejorar la exactitud.
 

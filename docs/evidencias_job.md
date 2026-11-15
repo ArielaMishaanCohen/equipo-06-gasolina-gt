@@ -41,9 +41,9 @@ Los notebooks están en `/Shared/Proyecto/Notebooks/Pipeline_entrega_20261115/`.
 El código se instaló como wheel 0.2.0 desde el Volume. Son copias del Workspace:
 el push local posterior no las actualiza automáticamente.
 
-## Pendientes externos
+## API pública
 
-La responsable de SSH debe desplegar y comprobar la API pública. Las siete consultas
-locales de FastAPI contra tablas reales respondieron HTTP 200. Oro sigue en tablas
-gestionadas porque las ubicaciones S3 disponibles son de solo lectura; hace falta
-aceptación del catedrático para SQL o una ubicación externa con escritura.
+La API está publicada en `http://159.65.111.14:8000` (Swagger en `/docs`) y lee Oro
+mediante el SQL warehouse; `/health` responde `fuente_oro=databricks`. Oro sigue en
+tablas gestionadas porque las ubicaciones S3 del curso son de solo lectura; el
+catedrático aprobó el 13 de noviembre el workspace propio con lectura por SQL warehouse.

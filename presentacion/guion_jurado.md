@@ -36,7 +36,7 @@ Ariela explica orquestación y alertas. 1 minuto.
 
 ## 9. Demostración de la API
 
-Ariela realiza la demo. Verificar el despliegue SSH antes del jurado.
+Ariela realiza la demo. Comprobar /health desde un teléfono antes del jurado.
 
 ## 10. Alcance y próximos pasos
 

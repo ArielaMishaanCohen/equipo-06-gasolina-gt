@@ -6,7 +6,7 @@ en **AWS S3 + Databricks**, entrena un modelo que predice si el precio de **supe
 sube, baja o se mantiene la semana siguiente**, y publica precios y predicciones en una **API REST**
 en un Droplet de DigitalOcean.
 
-- API: `http://159.65.111.14:8006` · Swagger: `/docs` (puerto 80XX del equipo; confirmar)
+- API: `http://159.65.111.14:8000` · Swagger: `/docs`
 - Enunciado: [`docs/enunciado_cc3105_proyecto_final.pdf`](docs/enunciado_cc3105_proyecto_final.pdf)
 - Instructivo del equipo: [`docs/instructivos/INSTRUCTIVO_GENERAL.md`](docs/instructivos/INSTRUCTIVO_GENERAL.md)
 - Diagrama: [`docs/arquitectura.png`](docs/arquitectura.png) · Informe: [`docs/informe.pdf`](docs/informe.pdf) · Presentación: [`presentacion/`](presentacion/)
@@ -80,8 +80,8 @@ GHCR para correr la API en cualquier máquina con Docker.
 ```bash
 uv sync --extra api --extra dev      # o: python3.11 -m venv .venv && pip install -e ".[api,dev]"
 uv run pytest
-uv run gasolina-api                  # http://localhost:8006
-BASE_URL=http://localhost:8006 bash tests/consultas_api.sh
+uv run gasolina-api                  # http://localhost:8000
+BASE_URL=http://localhost:8000 bash tests/consultas_api.sh
 ```
 
 Sin credenciales, la API usa las tablas Oro de ejemplo de `artifacts_demo/oro/` y `/health` lo dice
@@ -100,5 +100,5 @@ Alina Carias, Marcos Diaz, Daniel Machic, Ignacio Mendez, Ariela Mishaan y Diego
 
 El cierre de Modelos está en [`docs/modelos/CIERRE_MODELOS.md`](docs/modelos/CIERRE_MODELOS.md).
 La responsable del servidor puede seguir
-[`docs/DESPLIEGUE_PARA_RESPONSABLE_SSH.md`](docs/DESPLIEGUE_PARA_RESPONSABLE_SSH.md).
+[`docs/DESPLIEGUE.md`](docs/DESPLIEGUE.md).
 El informe y los PDF del jurado se regeneran con `python scripts/generar_entregables.py`.

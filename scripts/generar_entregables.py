@@ -36,7 +36,7 @@ AZUL = colors.HexColor("#17324D")
 VERDE = colors.HexColor("#087F8C")
 GRIS = colors.HexColor("#536372")
 EQUIPO = "Alina Carias, Marcos Diaz, Daniel Machic, Ignacio Mendez, Ariela Mishaan y Diego Soto"
-API = "http://159.65.111.14:8006"
+API = "http://159.65.111.14:8000"
 
 
 def evidencia():
@@ -285,14 +285,14 @@ def diapositivas():
 
     nueva(
         "Demostración de la API",
-        "Ariela realiza la demo. Verificar el despliegue SSH antes del jurado.",
+        "Ariela realiza la demo. Comprobar /health desde un teléfono antes del jurado.",
     )
     y = 400
     for t in ["/health", "/precios/actual", "/precios", "/prediccion", "/modelo/metricas"]:
         y = parrafo(c, t, 44, y, 580, 24)
     c.drawImage(str(PRIVADO / "qr_api.png"), 700, 185, 170, 170)
     parrafo(c, API, 630, 145, 290, 16)
-    parrafo(c, "Verificación pública pendiente de despliegue por SSH.", 44, 65, 850, 18)
+    parrafo(c, "API pública con datos de Oro (fuente_oro=databricks).", 44, 65, 850, 18)
 
     nueva(
         "Alcance y próximos pasos",
@@ -352,7 +352,7 @@ def resumen():
         "La predicción disponible corresponde al 10 de noviembre de 2026 porque el "
         "histórico termina el 3. La estabilidad del precio es la clase con menor cobertura.",
         "La demo incluye el Job y las consultas de precio actual, predicción y métricas.",
-        "API prevista: " + API + ". Su verificación pública depende del despliegue por SSH.",
+        "API pública: " + API + " (documentación en /docs).",
     ]:
         story.append(Paragraph(seguro(t), estilos["resumen"]))
     story.append(Image(str(PRIVADO / "qr_api.png"), width=88, height=88, hAlign="LEFT"))
@@ -370,8 +370,15 @@ def resumen():
 def main():
     SALIDA.mkdir(parents=True, exist_ok=True)
     PRIVADO.mkdir(parents=True, exist_ok=True)
-    pdfmetrics.registerFont(TTFont("Arial", "C:/Windows/Fonts/arial.ttf"))
-    pdfmetrics.registerFont(TTFont("ArialBold", "C:/Windows/Fonts/arialbd.ttf"))
+    for normal, negrita in [
+        ("C:/Windows/Fonts/arial.ttf", "C:/Windows/Fonts/arialbd.ttf"),
+        ("/System/Library/Fonts/Supplemental/Arial.ttf",
+         "/System/Library/Fonts/Supplemental/Arial Bold.ttf"),
+    ]:
+        if Path(normal).exists() and Path(negrita).exists():
+            break
+    pdfmetrics.registerFont(TTFont("Arial", normal))
+    pdfmetrics.registerFont(TTFont("ArialBold", negrita))
     qrcode.make(API).save(PRIVADO / "qr_api.png")
     informe()
     diapositivas()
