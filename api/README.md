@@ -3,6 +3,32 @@
 API REST (FastAPI) sobre la capa **Oro**. Código: [`src/gasolina/api/app.py`](../src/gasolina/api/app.py)
 y lectura de Oro en [`src/gasolina/oro.py`](../src/gasolina/oro.py). Swagger en `/docs`.
 
+## Panel web de monitoreo
+
+La ruta `/` sirve **Octano**, la interfaz HTML del observatorio: precios por
+combustible, evolución semanal, predicciones, comparación con la línea base,
+estado de las tablas y exploración del histórico. Incluye filtros por combustible
+y fechas, paginación, selección de series y periodo del gráfico, actualización
+manual y exportación CSV de los registros filtrados.
+
+El archivo editable es [`index.html`](../src/gasolina/api/static/index.html).
+CSS, JavaScript y gráficos SVG están incluidos en el mismo HTML, sin CDN ni
+dependencias de frontend. Se adapta a escritorio y móvil. Los datos provienen
+de los endpoints de esta API; no lleva precios ni resultados prefijados.
+La interfaz identifica las fuentes de ejemplo y muestra errores de conexión
+sin sustituirlos por cifras inventadas.
+
+Para abrirlo localmente en Windows:
+
+```powershell
+.venv/Scripts/gasolina-api.exe
+```
+
+Visitar `http://localhost:8006/`. Abrir el archivo directamente permite ver la
+estructura, pero para cargar información se necesita servirlo desde la API.
+En el servidor se publicará en `http://159.65.111.14:8006/` después del despliegue
+por la responsable de SSH. No requiere un hosting separado del backend.
+
 | Endpoint | Qué devuelve |
 | --- | --- |
 | `GET /health` | Estado del servicio, fuente de Oro (`s3`, `databricks` o `demo`) y filas por tabla |
