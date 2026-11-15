@@ -51,7 +51,7 @@ grep -q '^APP_GID=' .env || echo "APP_GID=$(id -g)" >> .env
 chmod 600 .env
 # Cargar .env en este shell (para IMAGEN_DOCKER y el modo venv)
 set -a; . ./.env; set +a
-PUERTO="${PUERTO:-8006}"   # puerto 80XX del equipo (se define en .env)
+PUERTO="${PUERTO:-8000}"   # puerto 80XX del equipo (se define en .env)
 
 mostrar_log() {
   if [ "$MODO" = docker ]; then docker compose logs --tail 40 api; else tail -n 40 logs/api.log; fi

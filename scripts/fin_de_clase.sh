@@ -4,7 +4,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 [ -f .env ] && PUERTO_ENV=$(grep -E "^PUERTO=" .env | cut -d= -f2)
-PUERTO="${PUERTO:-${PUERTO_ENV:-8006}}"
+PUERTO="${PUERTO:-${PUERTO_ENV:-8000}}"
 
 if docker compose ps --status running api 2>/dev/null | grep -q api; then MODO=docker; else MODO=venv; fi
 echo "Modo: $MODO"

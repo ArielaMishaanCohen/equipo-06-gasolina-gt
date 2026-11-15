@@ -30,11 +30,11 @@ USER app
 ENV ORO_DEMO_DIR=/app/artifacts_demo/oro \
     LOGS_DIR=/app/logs \
     GASOLINA_CONFIG=/app/config/config.yaml \
-    PUERTO=8006
+    PUERTO=8000
 
-EXPOSE 8006
+EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-    CMD python -c "import os,urllib.request; urllib.request.urlopen(f'http://localhost:{os.environ.get(\"PUERTO\",\"8006\")}/health', timeout=4)" || exit 1
+    CMD python -c "import os,urllib.request; urllib.request.urlopen(f'http://localhost:{os.environ.get(\"PUERTO\",\"8000\")}/health', timeout=4)" || exit 1
 
 CMD ["gasolina-api"]

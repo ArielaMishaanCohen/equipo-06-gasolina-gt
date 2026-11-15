@@ -24,9 +24,9 @@ Para abrirlo localmente en Windows:
 .venv/Scripts/gasolina-api.exe
 ```
 
-Visitar `http://localhost:8006/`. Abrir el archivo directamente permite ver la
+Visitar `http://localhost:8000/`. Abrir el archivo directamente permite ver la
 estructura, pero para cargar información se necesita servirlo desde la API.
-En el servidor se publicará en `http://159.65.111.14:8006/` después del despliegue
+En el servidor se publicará en `http://159.65.111.14:8000/` después del despliegue
 por la responsable de SSH. No requiere un hosting separado del backend.
 
 | Endpoint | Qué devuelve |
@@ -66,4 +66,4 @@ La API lee Oro con credenciales **de solo lectura**.
 ## Pruebas
 
 - `pytest` (en el CI): endpoints, filtros, errores y contratos con tablas Oro de ejemplo.
-- `BASE_URL=http://159.65.111.14:8006 bash tests/consultas_api.sh`: prueba de usuario final.
+- `BASE_URL=http://159.65.111.14:8000 bash tests/consultas_api.sh`: prueba de usuario final.

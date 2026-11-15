@@ -1,7 +1,7 @@
-# Despliegue para la responsable de SSH
+# Despliegue de la API
 
-Los cambios están preparados en la rama `modelos-completar`. El integrante debe hacer
-commit y push antes de ejecutar esta guía en el servidor.
+La entrega está integrada en `main`. El servidor ya tiene el `.env` configurado
+(puerto 8000, SQL warehouse); para actualizar basta con traer `main` y volver a desplegar.
 
 ## Actualizar el proyecto
 
@@ -10,20 +10,17 @@ Utiliza la llave y el usuario asignados al equipo. Confirma que el servidor est�
 ```bash
 ssh -i RUTA_DE_TU_LLAVE USUARIO_DEL_EQUIPO@159.65.111.14
 cd ~/apps/gasolina-mlops
-git fetch origin
-git switch modelos-completar
+git switch main
 git pull --ff-only
 ```
 
-Si el equipo ya integró la entrega a `main`, utiliza esa rama.
-
 ## Configurar el archivo privado .env
 
-Las tablas del workspace son gestionadas. La alternativa de lectura ya implementada usa
-el SQL warehouse. Configura estos valores directamente en el servidor.
+Solo hace falta en una instalación nueva. Las tablas del workspace son gestionadas y la
+API las lee por el SQL warehouse (aprobado por el catedrático el 13 de noviembre).
 
 ```dotenv
-PUERTO=8006
+PUERTO=8000
 DATABRICKS_HOST=https://dbc-f51e9943-f137.cloud.databricks.com
 DATABRICKS_TOKEN=TOKEN_DE_LA_CUENTA_AUTORIZADA
 DATABRICKS_WAREHOUSE_ID=48a52c351a0af482
@@ -40,16 +37,16 @@ Los tokens y las llaves se configuran en el servidor y se excluyen de Git.
 ```bash
 chmod 600 .env
 bash scripts/deploy.sh --modo venv
-curl --fail --max-time 30 http://localhost:8006/health
-BASE_URL=http://localhost:8006 bash tests/consultas_api.sh
+curl --fail --max-time 30 http://localhost:8000/health
+BASE_URL=http://localhost:8000 bash tests/consultas_api.sh
 ```
 
 Si falla el despliegue, revisa `logs/api.log` y el acceso del token al warehouse.
 Después comprueba desde otra computadora.
 
 ```bash
-curl --fail --max-time 30 http://159.65.111.14:8006/health
-BASE_URL=http://159.65.111.14:8006 bash tests/consultas_api.sh
+curl --fail --max-time 30 http://159.65.111.14:8000/health
+BASE_URL=http://159.65.111.14:8000 bash tests/consultas_api.sh
 ```
 
 La respuesta de health debe indicar `fuente_oro=databricks` para esta configuración.
@@ -64,8 +61,8 @@ configurada. Cambiar de subdirectorio dentro de una ubicación de solo lectura c
 la restricción. El almacenamiento gestionado de Unity Catalog tampoco puede reutilizarse
 como ruta de una tabla externa.
 
-La alternativa implementada por SQL funciona con las tablas actuales. El equipo debe
-confirmar su aceptación con el catedrático. Si se exige S3 directo, se necesita una ruta
+La alternativa implementada por SQL funciona con las tablas actuales y fue aprobada
+por el catedrático. Si en el futuro se exigiera S3 directo, se necesitaría una ruta
 autorizada y las credenciales de lectura correspondientes para la API.
 
 Referencias oficiales sobre las restricciones de almacenamiento.
