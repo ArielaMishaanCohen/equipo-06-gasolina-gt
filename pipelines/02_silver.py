@@ -33,7 +33,7 @@ print(WHEEL_GASOLINA)
 
 # COMMAND ----------
 
-# MAGIC %pip install $WHEEL_GASOLINA
+# MAGIC %pip install $WHEEL_GASOLINA "numpy>=1.26,<2" "pandas>=2,<3" "protobuf>=4.25.3,<5"
 
 # COMMAND ----------
 

@@ -46,7 +46,8 @@ def extraer(argv: list[str] | None = None) -> None:
 
 def evaluar(argv: list[str] | None = None) -> None:
     """% de precios correctos contra la revisión manual (datos/etiquetas.csv)."""
-    from gasolina.evaluacion import evaluar_carpeta
+    from gasolina.evaluacion import elegir_configuracion, evaluar_carpeta
+    from gasolina.ocr import PREPROCS
 
     p = argparse.ArgumentParser(prog="gasolina-evaluar", description="Evalúa contra etiquetas.")
     p.add_argument("--etiquetas", type=Path, default=Path("../datos/etiquetas.csv"))
@@ -56,13 +57,33 @@ def evaluar(argv: list[str] | None = None) -> None:
     p.add_argument("--estrategia", default="fusion", choices=["fusion", "solo_B"])
     p.add_argument("--sin-segunda-pasada", action="store_true")
     p.add_argument("--detalle", action="store_true", help="incluir el resultado por foto")
+    p.add_argument("--comparar-preprocs", action="store_true",
+                   help="evaluar los 4 preprocesamientos")
+    p.add_argument("--salida", type=Path, help="guardar el resultado completo en JSON")
     a = p.parse_args(argv)
     if not a.etiquetas.is_file():
         p.error(f"No existe {a.etiquetas}")
-    out = evaluar_carpeta(a.etiquetas, a.imagenes, motor=a.motor, preproc=a.preproc,
-                          estrategia=a.estrategia, segunda_pasada=not a.sin_segunda_pasada)
+    corridas = [evaluar_carpeta(
+        a.etiquetas, a.imagenes, motor=a.motor, preproc=preproc,
+        estrategia=a.estrategia, segunda_pasada=not a.sin_segunda_pasada,
+    ) for preproc in (PREPROCS if a.comparar_preprocs else [a.preproc])]
+    if a.comparar_preprocs:
+        try:
+            ganador = elegir_configuracion(corridas)["parametros"]
+            pendiente = None
+        except ValueError as exc:
+            ganador, pendiente = None, str(exc)
+        out = {"corridas": corridas, "configuracion_recomendada": ganador,
+               "pendiente": pendiente}
+    else:
+        out = corridas[0]
+    if a.salida:
+        a.salida.parent.mkdir(parents=True, exist_ok=True)
+        a.salida.write_text(json.dumps(out, indent=2, ensure_ascii=False, default=str),
+                            encoding="utf-8")
     if not a.detalle:
-        out.pop("por_foto")
+        for corrida in corridas:
+            corrida.pop("por_foto")
     print(json.dumps(out, indent=2, ensure_ascii=False, default=str))
 
 

@@ -50,11 +50,25 @@ COLUMNAS_METRICAS = ["fecha_entrenamiento", "modelo", "version_modelo", "accurac
 
 def _limpiar(df: pd.DataFrame, solo_con_direccion: bool = True) -> pd.DataFrame:
     df = df.copy()
-    df["semana_inicio"] = pd.to_datetime(df["semana_inicio"]).dt.date
+    requeridas = {"semana_inicio", "combustible", "direccion_actual", "direccion_siguiente"}
+    if faltantes := requeridas - set(df.columns):
+        raise ValueError(f"Faltan columnas de features_modelo: {sorted(faltantes)}")
+    fechas = pd.to_datetime(df["semana_inicio"], errors="coerce")
+    if fechas.isna().any() or (fechas.dt.dayofweek != 1).any():
+        raise ValueError("semana_inicio debe contener fechas válidas de martes")
+    df["semana_inicio"] = fechas.dt.date
+    if df.duplicated(["semana_inicio", "combustible"]).any():
+        raise ValueError("Llave duplicada en features_modelo: semana_inicio, combustible")
+    if not df["combustible"].isin(COMBUSTIBLES).all():
+        raise ValueError("Combustible fuera del catálogo de features_modelo")
+    for c in ("direccion_actual", "direccion_siguiente"):
+        if not df[c].dropna().isin(CLASES).all():
+            raise ValueError(f"Clase inválida en {c}")
     for c in NUMERICAS:
         if c not in df:
             df[c] = np.nan
-        df[c] = pd.to_numeric(df[c], errors="coerce").astype(float)
+        df[c] = (pd.to_numeric(df[c], errors="coerce").astype(float)
+                 .replace([np.inf, -np.inf], np.nan))
     if solo_con_direccion:
         df = df[df["direccion_actual"].notna()]
     return df.sort_values(["semana_inicio", "combustible"])
@@ -65,6 +79,8 @@ def dividir_temporal(features: pd.DataFrame, n_test: int = N_TEST):
     objetivo conocido; `por_predecir` es la última semana de la serie aunque le falten variables
     (p. ej. después de un hueco del MEM no hay `direccion_actual`): se predice igual con las
     variables imputadas, porque lo que interesa es la semana siguiente a la última."""
+    if isinstance(n_test, bool) or not isinstance(n_test, int) or n_test < 1:
+        raise ValueError("n_test debe ser un entero positivo")
     df = _limpiar(features)
     conocidas = df[df["direccion_siguiente"].notna()]
     semanas = sorted(conocidas["semana_inicio"].unique())
@@ -128,6 +144,7 @@ class Comparacion:
     n_entrenamiento: int
     n_prueba: int
     semanas_test: tuple
+    descartados: dict[str, str] = field(default_factory=dict)
 
     @property
     def baseline(self) -> Resultado:
@@ -147,14 +164,18 @@ def entrenar_y_comparar(features: pd.DataFrame, n_test: int = N_TEST,
     X_te, y_te = prueba[NUMERICAS + CATEGORICAS], prueba["direccion_siguiente"]
 
     resultados = {LINEA_BASE: Resultado(LINEA_BASE, metricas(y_te, prueba["direccion_actual"]))}
+    descartados = {}
     for nombre, pipe in candidatos(semilla).items():
+        if nombre == "regresion_logistica" and y_tr.nunique() < 2:
+            descartados[nombre] = "El entrenamiento contiene una sola clase; requiere al menos dos"
+            continue
         pipe.fit(X_tr, y_tr)
         params = {k: v for k, v in pipe.named_steps["clf"].get_params().items()
                   if isinstance(v, (int, float, str, bool)) or v is None}
         resultados[nombre] = Resultado(nombre, metricas(y_te, pipe.predict(X_te)), pipe, params)
 
     comp = Comparacion(resultados, LINEA_BASE, n_test, len(entrenamiento), len(prueba),
-                       tuple(sorted(prueba["semana_inicio"].unique())))
+                       tuple(sorted(prueba["semana_inicio"].unique())), descartados)
     mejores = sorted((r for r in resultados.values() if r.modelo is not None),
                      key=lambda r: (r.metricas["f1_macro"], r.metricas["accuracy"]), reverse=True)
     if mejores and comp.supera_baseline(mejores[0].nombre):
@@ -176,9 +197,21 @@ def predecir(features: pd.DataFrame, nombre: str, modelo: Pipeline | None,
              version_modelo: str, mlflow_run_id: str | None = None,
              ahora: datetime | None = None) -> pd.DataFrame:
     """Predicción de la semana siguiente a la última (contrato de `gold.predicciones`)."""
-    _, _, ult = dividir_temporal(features, n_test=1) if len(features) else (None, None, features)
+    if nombre not in {LINEA_BASE, *candidatos()}:
+        raise ValueError(f"Modelo desconocido: {nombre}")
+    if (nombre == LINEA_BASE) != (modelo is None):
+        raise ValueError("El nombre del modelo y el estimador no coinciden")
     ahora = ahora or datetime.now(timezone.utc)
-    if ult is None or ult.empty:
+    if features.empty:
+        return pd.DataFrame(columns=COLUMNAS_PREDICCIONES)
+    df = _limpiar(features, solo_con_direccion=False)
+    ult = df[(df["semana_inicio"] == df["semana_inicio"].max())
+             & df["direccion_siguiente"].isna()].copy()
+    # Sin dirección actual la línea base no está definida. No publicar una clase nula
+    # ni inventar se_mantiene después de un hueco del histórico.
+    if modelo is None:
+        ult = ult[ult["direccion_actual"].notna()]
+    if ult.empty:
         return pd.DataFrame(columns=COLUMNAS_PREDICCIONES)
     if modelo is None:
         pred, prob = ult["direccion_actual"].tolist(), [None] * len(ult)

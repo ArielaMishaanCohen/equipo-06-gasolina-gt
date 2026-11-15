@@ -1,0 +1,105 @@
+{
+  "job_id": 637916192930332,
+  "runs": [
+    {
+      "run_id": 337245597755365,
+      "url": "https://dbc-f51e9943-f137.cloud.databricks.com/?o=1420684327351409#job/637916192930332/run/337245597755365",
+      "state": {
+        "life_cycle_state": "TERMINATED",
+        "result_state": "SUCCESS",
+        "state_message": "",
+        "user_cancelled_or_timedout": false
+      },
+      "fotos": 1,
+      "rutas": 1,
+      "tareas": [
+        {
+          "task_key": "bronze",
+          "run_id": 348508032581886,
+          "execution_duration": 38000,
+          "setup_duration": 2000,
+          "state": {
+            "life_cycle_state": "TERMINATED",
+            "result_state": "SUCCESS",
+            "state_message": "",
+            "user_cancelled_or_timedout": false
+          }
+        },
+        {
+          "task_key": "silver",
+          "run_id": 323500158112837,
+          "execution_duration": 167000,
+          "setup_duration": 1000,
+          "state": {
+            "life_cycle_state": "TERMINATED",
+            "result_state": "SUCCESS",
+            "state_message": "",
+            "user_cancelled_or_timedout": false
+          }
+        },
+        {
+          "task_key": "gold",
+          "run_id": 254564647541103,
+          "execution_duration": 139000,
+          "setup_duration": 2000,
+          "state": {
+            "life_cycle_state": "TERMINATED",
+            "result_state": "SUCCESS",
+            "state_message": "",
+            "user_cancelled_or_timedout": false
+          }
+        }
+      ]
+    },
+    {
+      "run_id": 417806436744272,
+      "url": "https://dbc-f51e9943-f137.cloud.databricks.com/?o=1420684327351409#job/637916192930332/run/417806436744272",
+      "state": {
+        "life_cycle_state": "TERMINATED",
+        "result_state": "SUCCESS",
+        "state_message": "",
+        "user_cancelled_or_timedout": false
+      },
+      "fotos": 2,
+      "rutas": 2,
+      "tareas": [
+        {
+          "task_key": "bronze",
+          "run_id": 86888683311140,
+          "execution_duration": 36000,
+          "setup_duration": 2000,
+          "state": {
+            "life_cycle_state": "TERMINATED",
+            "result_state": "SUCCESS",
+            "state_message": "",
+            "user_cancelled_or_timedout": false
+          }
+        },
+        {
+          "task_key": "silver",
+          "run_id": 1043467677034399,
+          "execution_duration": 144000,
+          "setup_duration": 1000,
+          "state": {
+            "life_cycle_state": "TERMINATED",
+            "result_state": "SUCCESS",
+            "state_message": "",
+            "user_cancelled_or_timedout": false
+          }
+        },
+        {
+          "task_key": "gold",
+          "run_id": 702424225104284,
+          "execution_duration": 139000,
+          "setup_duration": 1000,
+          "state": {
+            "life_cycle_state": "TERMINATED",
+            "result_state": "SUCCESS",
+            "state_message": "",
+            "user_cancelled_or_timedout": false
+          }
+        }
+      ]
+    }
+  ]
+}

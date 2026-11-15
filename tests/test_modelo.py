@@ -105,3 +105,51 @@ def test_predice_la_ultima_semana_aunque_falte_direccion_actual():
     assert (pred["semana_objetivo"] == ultima + timedelta(days=7)).all()
     assert set(pred["prediccion"]) <= set(M.CLASES) and pred["prediccion_baseline"].isna().all()
     assert comp.n_prueba == 30
+
+
+def test_una_sola_clase_conserva_baseline_y_explica_logistica_omitida():
+    df = _features()
+    df["direccion_actual"] = "se_mantiene"
+    df.loc[df["direccion_siguiente"].notna(), "direccion_siguiente"] = "se_mantiene"
+    comp = M.entrenar_y_comparar(df)
+    assert comp.elegido == M.LINEA_BASE
+    assert comp.baseline.metricas["accuracy"] == 1
+    assert "regresion_logistica" in comp.descartados
+    assert "arbol_decision" in comp.resultados
+
+
+def test_prediccion_baseline_no_necesita_historico_de_entrenamiento():
+    df = _features(n_semanas=1)
+    pred = M.predecir(df, M.LINEA_BASE, None, "test")
+    assert len(pred) == 3
+
+
+def test_baseline_omite_combustible_sin_direccion_en_lugar_de_publicar_clase_nula():
+    df = _features(n_semanas=1)
+    df.loc[df.combustible == "diesel", "direccion_actual"] = None
+    pred = M.predecir(df, M.LINEA_BASE, None, "test")
+    assert set(pred.combustible) == {"super", "regular"}
+    assert pred.prediccion.notna().all()
+
+
+@pytest.mark.parametrize("n_test", [0, -1, True, 1.5])
+def test_rechaza_tamano_test_invalido(n_test):
+    with pytest.raises(ValueError, match="entero positivo"):
+        M.dividir_temporal(_features(), n_test)
+
+
+@pytest.mark.parametrize("campo,valor", [
+    ("direccion_siguiente", "estable"), ("combustible", "vpower"),
+    ("semana_inicio", date(2025, 1, 8)),
+])
+def test_rechaza_datos_que_rompen_contrato(campo, valor):
+    df = _features()
+    df.loc[0, campo] = valor
+    with pytest.raises(ValueError):
+        M.entrenar_y_comparar(df)
+
+
+def test_rechaza_llaves_duplicadas_antes_de_entrenar():
+    df = _features()
+    with pytest.raises(ValueError, match="duplicada"):
+        M.entrenar_y_comparar(pd.concat([df, df.head(1)]))
