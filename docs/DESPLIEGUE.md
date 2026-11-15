@@ -69,3 +69,14 @@ Referencias oficiales sobre las restricciones de almacenamiento.
 
 - https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/manage-external-locations
 - https://docs.databricks.com/aws/en/volumes/paths
+
+## Rotar el token de Databricks
+
+1. En Databricks: foto de perfil → Settings → Developer → Access tokens → Generate new token
+   (nombre `servidor-g6-AAAAMMDD`, 90 días). Copiarlo una sola vez.
+2. En el servidor, reemplazar la línea `DATABRICKS_TOKEN=` del `.env` con un editor
+   (`nano ~/apps/gasolina-mlops/.env`), sin pegar el token en la terminal ni en el chat.
+3. Volver a desplegar y comprobar que `/health` siga respondiendo `fuente_oro=databricks`:
+   `bash scripts/deploy.sh --modo venv && curl -s http://localhost:8000/health`.
+4. Hacer lo mismo en el `.env` local si se usa.
+5. Solo después de comprobarlo, revocar el token anterior en Access tokens.
