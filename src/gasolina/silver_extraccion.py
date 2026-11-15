@@ -7,6 +7,7 @@ Los errores de instalación/OCR se propagan: no son fotos sin precios legibles.
 from __future__ import annotations
 
 import json
+import math
 from datetime import date
 from importlib.metadata import version
 
@@ -101,8 +102,11 @@ def evaluar_resultados(resultados, etiquetas):
         precios = verdad.setdefault(nombre, {})
         if combustible in precios:
             raise ValueError(f"Etiqueta duplicada: {nombre}, {combustible}")
+        precio = float(etiqueta["precio_q_galon"])
+        if not nombre or not math.isfinite(precio):
+            raise ValueError(f"Etiqueta inválida: {etiqueta}")
         precios[combustible] = {
-            "precio": float(etiqueta["precio_q_galon"]),
+            "precio": precio,
             "lectura": etiqueta.get("lectura") or "a_simple_vista",
         }
     if not verdad:
@@ -129,6 +133,7 @@ def evaluar_resultados(resultados, etiquetas):
             "incorrectos": sum(e.startswith("incorrecto") for e in estados),
             "no_encontrados": estados.count("no_encontrado"),
             "sin_etiqueta": len(foto["sin_etiqueta"]),
+            "falsos_positivos": foto["falsos_positivos"],
             "pct_precios_correctos": round(100 * correctos / len(estados), 1),
             "tiempo_ms": foto["tiempo_ms"], "foto_en_bronce": foto["foto"] in pred,
             "detalle": json.dumps(foto["detalle"], ensure_ascii=False),

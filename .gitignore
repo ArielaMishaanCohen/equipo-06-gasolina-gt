@@ -15,6 +15,7 @@ datos/
 
 # Generados en ejecución
 artifacts/
+output/
 logs/
 api.pid
 mlruns/

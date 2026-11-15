@@ -130,9 +130,10 @@ def detectar_combustible(texto: str) -> str | None:
 
 def detectar_modalidad(detecciones: list[dict]) -> str | None:
     texto = " ".join(_letras(d["texto"]) for d in detecciones)
-    if "autoservicio" in texto or "selfservice" in texto:
+    compacto = texto.replace(" ", "")
+    if "autoservicio" in compacto or "selfservice" in compacto:
         return "autoservicio"
-    if "serviciocompleto" in texto or "fullservice" in texto or "completo" in texto:
+    if "serviciocompleto" in compacto or "fullservice" in compacto or "completo" in texto:
         return "servicio_completo"
     return None
 
@@ -155,11 +156,17 @@ def clasificar_tipo_foto(detecciones: list[dict], n_precios: int) -> str:
     """bomba (pantallitas de dispensador) | tabla_mem | rotulo | desconocido."""
     palabras = [_letras(d["texto"]) for d in detecciones]
     t = " ".join(palabras)
-    if any(k in t for k in ("estaventa", "galones", "preciopor", "porgalon")):
-        return "bomba"
     if any(k in t for k in ("ministerio", "energiayminas", "referencia")) or "mem" in palabras:
         if n_precios >= 3:
             return "tabla_mem"
+    precios = candidatos_precio(detecciones)
+    if len(precios) >= 2 and not any(k in t for k in ("estaventa", "galones")):
+        alturas = [centro(p["bbox"])[1] for p in precios]
+        alto_tipico = statistics.median(alto(p["bbox"]) for p in precios)
+        if max(alturas) - min(alturas) > 6 * alto_tipico:
+            return "rotulo"
+    if any(k in t for k in ("estaventa", "galones", "preciopor", "porgalon")):
+        return "bomba"
     # Paneles de dispensador Shell/Puma sin rótulos legibles (FuelSave, V-Power, CLEANTEC...)
     if detectar_marca(detecciones) and (n_precios >= 2 or leer_ruta_a(detecciones)["precio_a"]):
         return "bomba"
@@ -213,6 +220,12 @@ def candidatos_precio(detecciones: list[dict], rango=RANGO_CANDIDATO) -> list[di
     out = []
     for d in detecciones:
         v = es_precio(d["texto"], rango)
+        # El OCR puede agrupar combustible y precio en una sola detección.
+        # Un único importe decimal junto a una etiqueta conserva la asociación.
+        if v is None and detectar_combustible(d["texto"]):
+            importes = re.findall(r"(?<![\d.,])(?:Q\s*)?\d{2}[.,]\d{2}(?!\d)", d["texto"])
+            if len(importes) == 1:
+                v = es_precio(importes[0], rango)
         if v is not None:
             out.append({**d, "valor": v})
     return out

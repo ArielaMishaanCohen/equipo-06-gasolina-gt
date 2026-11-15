@@ -9,7 +9,7 @@ en un Droplet de DigitalOcean.
 - API: `http://159.65.111.14:8006` · Swagger: `/docs` (puerto 80XX del equipo; confirmar)
 - Enunciado: [`docs/enunciado_cc3105_proyecto_final.pdf`](docs/enunciado_cc3105_proyecto_final.pdf)
 - Instructivo del equipo: [`docs/instructivos/INSTRUCTIVO_GENERAL.md`](docs/instructivos/INSTRUCTIVO_GENERAL.md)
-- Diagrama: [`docs/arquitectura.png`](docs/arquitectura.png) · Informe: [`docs/informe.pdf`](docs/) · Presentación: [`presentacion/`](presentacion/)
+- Diagrama: [`docs/arquitectura.png`](docs/arquitectura.png) · Informe: [`docs/informe.pdf`](docs/informe.pdf) · Presentación: [`presentacion/`](presentacion/)
 
 ## Arquitectura
 
@@ -30,9 +30,10 @@ Volume crudos/fotos/  ──►  BRONCE  workspace.equipo6_bronze   bronze.fotos
                              API FastAPI en el Droplet (uv) ◄── usuario (HTTP) · equipo (SSH) · GitHub Actions (CD)
 ```
 
-Databricks: Job `equipo6-pipeline` con 3 tareas encadenadas (Bronce → Plata → Oro) en un job
-cluster, con trigger por llegada de archivos y alerta por correo. El desarrollo se hace en un
-cluster interactivo con autoterminación.
+Databricks: Job `equipo-06-pipeline` con tres tareas encadenadas, cómputo serverless con entorno
+versión 2, programación los martes a las 07:00 de Guatemala y alertas de fallo por correo.
+Los notebooks se desarrollan en el workspace con serverless. Las tablas actuales son gestionadas
+y la API puede consultarlas mediante SQL warehouse. Las ubicaciones S3 del curso son de solo lectura.
 
 ## Estructura
 
@@ -51,8 +52,9 @@ cluster interactivo con autoterminación.
 
 1. Workspace → Create → Git folder con este repo.
 2. Correr `pipelines/00_setup.sql` una vez (esquemas y tablas externas).
-3. Correr `01_bronze` → `02_silver` → `03_gold` en el cluster interactivo, o el Job
-   `equipo6-pipeline` con **Run now**. Los parámetros están en `config/config.yaml`.
+3. Seleccionar el entorno serverless **versión 2** para las dependencias de estos notebooks.
+   Ejecutar `01_bronze` → `02_silver` → `03_gold`, o el Job `equipo-06-pipeline` con **Run now**.
+   La definición exportada está en `pipelines/job.json` y las evidencias en `docs/evidencias_job.md`.
 
 ## Desplegar la API (Droplet)
 
@@ -94,8 +96,9 @@ Sin credenciales, la API usa las tablas Oro de ejemplo de `artifacts_demo/oro/` 
 
 ## Equipo
 
-| Rol | Integrante |
-| --- | --- |
-| Producción y coordinación | Ariela Mishaan |
-| Datos | ________ |
-| Modelos | ________ |
+Alina Carias, Marcos Diaz, Daniel Machic, Ignacio Mendez, Ariela Mishaan y Diego Soto.
+
+El cierre de Modelos está en [`docs/modelos/CIERRE_MODELOS.md`](docs/modelos/CIERRE_MODELOS.md).
+La responsable del servidor puede seguir
+[`docs/DESPLIEGUE_PARA_RESPONSABLE_SSH.md`](docs/DESPLIEGUE_PARA_RESPONSABLE_SSH.md).
+El informe y los PDF del jurado se regeneran con `python scripts/generar_entregables.py`.

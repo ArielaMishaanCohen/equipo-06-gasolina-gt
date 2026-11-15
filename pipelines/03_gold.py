@@ -35,7 +35,7 @@ print(WHEEL_GASOLINA)
 
 # COMMAND ----------
 
-# MAGIC %pip install $WHEEL_GASOLINA
+# MAGIC %pip install $WHEEL_GASOLINA "numpy>=1.26,<2" "pandas>=2,<3" "protobuf>=4.25.3,<5"
 
 # COMMAND ----------
 
@@ -380,6 +380,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import mlflow
+import mlflow.pyfunc
 import mlflow.sklearn
 from pyspark.sql.types import BooleanType, LongType, TimestampType
 
@@ -395,6 +396,8 @@ AHORA = datetime.now(timezone.utc).replace(microsecond=0)
 
 feat_pd = spark.table(f"{GOLD}.features_modelo").toPandas()
 comp = modelo.entrenar_y_comparar(feat_pd, n_test=N_TEST)
+for nombre, motivo in comp.descartados.items():
+    print(f"Candidato omitido: {nombre}: {motivo}")
 print(f"Entrenamiento: {comp.n_entrenamiento} filas | prueba: {comp.n_prueba} filas "
       f"({comp.n_semanas_test} semanas: {comp.semanas_test[0]} a {comp.semanas_test[-1]})")
 
@@ -434,6 +437,11 @@ for nombre, r in comp.resultados.items():
         mlflow.log_dict({"clases": modelo.CLASES, "matriz": r.metricas["matriz_confusion"],
                          "semanas_test": [str(s) for s in comp.semanas_test]},
                         "matriz_confusion.json")
+        mlflow.log_dict(comp.descartados, "candidatos_omitidos.json")
+        mlflow.log_dict({"criterio": "F1 macro estrictamente mayor que linea_base",
+                         "elegido": comp.elegido,
+                         "limitacion": "La misma prueba temporal se usa para comparar y elegir; no es una evaluación independiente de la selección."},
+                        "seleccion.json")
         run_ids[nombre] = run.info.run_id
 
 display(spark.createDataFrame(
@@ -448,29 +456,48 @@ print(f"Elegido: {comp.elegido}"
 
 # Reentrenar el elegido con todas las semanas, registrarlo y predecir la semana siguiente
 final = modelo.reentrenar_con_todo(feat_pd, comp.elegido)
-run_final = None
-if final is not None:
-    from mlflow.models import infer_signature
+from mlflow.models import infer_signature
 
-    ult_X = feat_pd[modelo.NUMERICAS + modelo.CATEGORICAS].tail(5)
-    for c in modelo.NUMERICAS:
-        ult_X[c] = ult_X[c].astype(float)
-    with mlflow.start_run(run_name=f"{comp.elegido} final {AHORA:%Y-%m-%d}") as run:
-        mlflow.set_tags({"equipo": "06", "tipo": "clasificador_direccion", "champion": "true",
-                         "version_modelo": VERSION})
-        mlflow.log_params({"modelo": comp.elegido, "entrenado_con": "todas las semanas"})
+
+class DireccionBaseline(mlflow.pyfunc.PythonModel):
+    """Artefacto reproducible de la regla elegida cuando no gana un clasificador."""
+
+    def predict(self, context, model_input, params=None):
+        return model_input["direccion_actual"].copy()
+
+
+# Ejemplo con dirección conocida; los nulos numéricos los maneja el imputador del pipeline.
+ult_X = (feat_pd.loc[feat_pd["direccion_actual"].notna()]
+         .reindex(columns=modelo.NUMERICAS + modelo.CATEGORICAS).tail(5).copy())
+for c in modelo.NUMERICAS:
+    ult_X[c] = pd.to_numeric(ult_X[c], errors="coerce").astype(float)
+with mlflow.start_run(run_name=f"{comp.elegido} final {AHORA:%Y-%m-%d}") as run:
+    mlflow.set_tags({"equipo": "06", "tipo": "clasificador_direccion", "champion": "true",
+                     "version_modelo": VERSION})
+    mlflow.log_params({"modelo": comp.elegido, "entrenado_con": "todas las semanas",
+                       "run_evaluacion": run_ids[comp.elegido]})
+    if final is not None:
         info = mlflow.sklearn.log_model(final, "modelo", input_example=ult_X,
                                         signature=infer_signature(ult_X, final.predict(ult_X)))
-        run_final = run.info.run_id
-    try:
-        reg = mlflow.register_model(info.model_uri, MODELO_UC)
-        print(f"Registrado en Unity Catalog: {MODELO_UC} v{reg.version}")
-    except Exception as e:  # sin permiso de crear modelos en UC: queda como modelo de MLflow
-        print(f"⚠️ No se pudo registrar en UC ({str(e).splitlines()[0][:200]}); "
-              f"queda el modelo de MLflow del run {run_final}.")
+    else:
+        ejemplo = ult_X[["direccion_actual"]]
+        info = mlflow.pyfunc.log_model("modelo", python_model=DireccionBaseline(),
+                                       input_example=ejemplo,
+                                       signature=infer_signature(ejemplo, ejemplo["direccion_actual"]))
+    run_final = run.info.run_id
+try:
+    reg = mlflow.register_model(info.model_uri, MODELO_UC)
+    print(f"Registrado en Unity Catalog: {MODELO_UC} v{reg.version}")
+except Exception as e:  # sin permiso de crear modelos en UC: queda como modelo de MLflow
+    print(f"⚠️ No se pudo registrar en UC ({str(e).splitlines()[0][:200]}); "
+          f"queda el modelo de MLflow del run {run_final}.")
 
 pred_pd = modelo.predecir(feat_pd, comp.elegido, final, VERSION,
                           run_final or run_ids.get(comp.elegido), AHORA)
+faltan_combustibles = set(modelo.COMBUSTIBLES) - set(pred_pd["combustible"])
+if faltan_combustibles:
+    print(f"⚠️ Sin predicción para {sorted(faltan_combustibles)}: revisar última semana y "
+          "direccion_actual (la línea base no se define después de un hueco).")
 display(pred_pd)
 
 # COMMAND ----------
