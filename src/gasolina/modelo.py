@@ -48,19 +48,23 @@ COLUMNAS_METRICAS = ["fecha_entrenamiento", "modelo", "version_modelo", "accurac
                      "n_semanas_test", "supera_baseline", "mlflow_run_id", "es_champion"]
 
 
-def _limpiar(df: pd.DataFrame) -> pd.DataFrame:
+def _limpiar(df: pd.DataFrame, solo_con_direccion: bool = True) -> pd.DataFrame:
     df = df.copy()
     df["semana_inicio"] = pd.to_datetime(df["semana_inicio"]).dt.date
     for c in NUMERICAS:
         if c not in df:
             df[c] = np.nan
         df[c] = pd.to_numeric(df[c], errors="coerce").astype(float)
-    return df[df["direccion_actual"].notna()].sort_values(["semana_inicio", "combustible"])
+    if solo_con_direccion:
+        df = df[df["direccion_actual"].notna()]
+    return df.sort_values(["semana_inicio", "combustible"])
 
 
 def dividir_temporal(features: pd.DataFrame, n_test: int = N_TEST):
     """(entrenamiento, prueba, por_predecir). La prueba son las últimas `n_test` semanas con
-    objetivo conocido; `por_predecir` es la última semana (objetivo nulo)."""
+    objetivo conocido; `por_predecir` es la última semana de la serie aunque le falten variables
+    (p. ej. después de un hueco del MEM no hay `direccion_actual`): se predice igual con las
+    variables imputadas, porque lo que interesa es la semana siguiente a la última."""
     df = _limpiar(features)
     conocidas = df[df["direccion_siguiente"].notna()]
     semanas = sorted(conocidas["semana_inicio"].unique())
@@ -69,8 +73,9 @@ def dividir_temporal(features: pd.DataFrame, n_test: int = N_TEST):
     corte = semanas[-n_test]
     entrenamiento = conocidas[conocidas["semana_inicio"] < corte]
     prueba = conocidas[conocidas["semana_inicio"] >= corte]
-    ultima = df["semana_inicio"].max()
-    por_predecir = df[(df["semana_inicio"] == ultima) & df["direccion_siguiente"].isna()]
+    todo = _limpiar(features, solo_con_direccion=False)
+    ultima = todo["semana_inicio"].max()
+    por_predecir = todo[(todo["semana_inicio"] == ultima) & todo["direccion_siguiente"].isna()]
     return entrenamiento, prueba, por_predecir
 
 
@@ -178,7 +183,9 @@ def predecir(features: pd.DataFrame, nombre: str, modelo: Pipeline | None,
     if modelo is None:
         pred, prob = ult["direccion_actual"].tolist(), [None] * len(ult)
     else:
-        P = modelo.predict_proba(ult[NUMERICAS + CATEGORICAS])
+        X = ult[NUMERICAS + CATEGORICAS].copy()
+        X["direccion_actual"] = X["direccion_actual"].fillna("desconocida")  # one-hot: todo 0
+        P = modelo.predict_proba(X)
         clases = list(modelo.classes_)
         pred = [clases[i] for i in P.argmax(axis=1)]
         prob = [round(float(p), 4) for p in P.max(axis=1)]
