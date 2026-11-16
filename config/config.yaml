@@ -9,15 +9,16 @@ equipo:
 databricks:
   catalogo: workspace
   esquemas:                         # (confirmar nombres con el catedrático)
-    bronze: equipo6_bronze
-    silver: equipo6_silver
-    gold: equipo6_gold
+    bronze: equipo_06_bronze
+    silver: equipo_06_silver
+    gold: equipo_06_gold
   job: equipo6-pipeline
 
-# Workspace propio (13 nov): tablas gestionadas y archivos en este Volume.
-volumen_crudos: /Volumes/workspace/equipo6_bronze/crudos   # fotos/, complementarias/{mem,fred}/
+# Archivos de trabajo (complementarias/, etiquetas.csv, _checkpoints/, _wheels/).
+volumen_crudos: /Volumes/workspace/equipo6_bronze/crudos
 
-# Buckets del curso (alternativa: pasar estas rutas a los widgets ruta_* para tablas externas)
+# Buckets del curso. Las fotos se leen siempre de xloc-raw. Para tablas externas se pasan las rutas
+# de capa a los widgets ruta_tablas_bronze / ruta_equipo_silver / ruta_equipo_oro del Job.
 s3:
   fotos: s3://cc3105-raw-869227452861-us-east-2-an/img/          # xloc-raw (solo lectura)
   bronze: s3://cc3105-cusn-869227452861-us-east-2-an/equipo6     # xloc-cusn

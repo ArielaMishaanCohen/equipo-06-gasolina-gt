@@ -102,17 +102,16 @@ Droplet: API pública en http://159.65.111.14:8000
 las imágenes en precios y separa los registros rechazados. Oro organiza las semanas
 y genera los resultados del modelo. La API permite consultarlos sin abrir un notebook.”
 
-**Precisión operativa**: las tablas verificadas son Delta gestionadas y las fotos
-están en un Volume de Unity Catalog. La lectura implementada para la API usa SQL
-warehouse. Si el diagrama anterior muestra escritura a buckets externos, ajustar
-esa parte al estado real antes de usarlo: las ubicaciones S3 disponibles son de
-solo lectura y el catedrático aprobó el 13/11 el workspace propio con lectura por SQL warehouse.
+**Precisión operativa**: Bronce lee las fotos del bucket del catedrático por la
+external location `xloc-raw`. Las tablas son Delta gestionadas en `equipo_06_*` porque
+`xloc-cusn/ag/au` siguen de solo lectura; el Job ya recibe las rutas `s3://` por capa
+para crearlas como externas en cuanto se habilite la escritura. La API lee Oro con SQL warehouse.
 
 ### Diapositiva 3. Conservamos las fotos y medimos con referencias manuales
 
 **Texto visible**
 
-- **38 fotos** oficiales disponibles en Bronce.
+- **110 fotos** oficiales (2023–2026) leídas de S3 a Bronce.
 - **36 fotos y 85 precios** con referencia manual para evaluar OCR.
 - Histórico de variables: **264 filas**, del **26/11/2024 al 03/11/2026**.
 - Precios en **quetzales por galón**; semanas de **martes a lunes**.
@@ -124,7 +123,7 @@ Identificar por separado “fotos”, “precios etiquetados” y “filas del h
 
 “La evaluación de lectura utiliza las etiquetas existentes del equipo: 85 precios
 legibles en 36 fotos. Los datos históricos del MEM aportan las observaciones para
-el clasificador; las 38 fotos no son por sí solas todo el conjunto de entrenamiento.
+el clasificador; las 110 fotos no son por sí solas todo el conjunto de entrenamiento.
 Conservamos fecha y ubicación desde EXIF cuando están disponibles y usamos la
 carpeta de origen como respaldo para la fecha.”
 
@@ -172,8 +171,8 @@ imagen al doble no mejoró el resultado y elevó el consumo de memoria.”
 
 **Texto visible**
 
-- **93 filas aceptadas** y **3 rechazadas** en Plata.
-- Rechazo: **3/96 = 3.125%** de las filas contabilizadas.
+- **221 filas aceptadas** y **26 rechazadas** en Plata.
+- Rechazo: **26/247 = 10.5%** de las filas contabilizadas.
 - Reglas: combustible válido, rango **Q20–Q60**, fecha y confianza.
 - Trazabilidad y carga mediante MERGE para evitar duplicados.
 
@@ -265,7 +264,7 @@ necesitamos una evaluación futura independiente para estimar mejor su desempeñ
 Después de elegirlo, se reentrena con las observaciones elegibles disponibles y se
 conserva en MLflow junto con métricas y matrices de confusión.”
 
-**Fuente**: corrida de Oro y tabla `workspace.equipo6_gold.metricas_modelo`.
+**Fuente**: corrida de Oro y tabla `workspace.equipo_06_gold.metricas_modelo`.
 No llamar a las probabilidades “certeza” ni presentar la mejora como estadísticamente
 significativa: no se realizó ese análisis.
 
@@ -476,9 +475,10 @@ para validación con rutas y esquemas aislados, mediante `batch_merge`.
 
 **¿Dónde están las tablas y por qué no leen directamente de S3?**
 
-Son tablas gestionadas de Unity Catalog. Las ubicaciones S3 del curso están marcadas
-como solo lectura. La API implementa consulta por SQL warehouse. El catedrático aprobó
-esta alternativa el 13 de noviembre (workspace propio del equipo).
+Las fotos sí se leen de S3, por la external location `xloc-raw`. Las tablas son
+gestionadas porque las external locations de escritura (`xloc-cusn/ag/au`) siguen
+marcadas como solo lectura; el Job ya acepta las rutas `s3://` de cada capa. La API
+consulta Oro por SQL warehouse, alternativa aprobada por el catedrático el 13 de noviembre.
 
 **¿Qué ocurre si el pipeline falla?**
 
@@ -517,7 +517,7 @@ Requieren acceso autorizado al workspace; no sustituyen un enlace público para 
 - [Oro productivo y modelos, SUCCESS](https://dbc-f51e9943-f137.cloud.databricks.com/?o=1420684327351409#job/179065592137118/run/31229731884243).
 - [Comparación OCR, SUCCESS](https://dbc-f51e9943-f137.cloud.databricks.com/?o=1420684327351409#job/640585771730337/run/555603084915275).
 
-Las fotos originales están en `/Volumes/workspace/equipo6_bronze/crudos/fotos/`.
+Las fotos originales están en `s3://cc3105-raw-869227452861-us-east-2-an/img/` (external location `xloc-raw`).
 El CSV de referencia está en `/Volumes/workspace/equipo6_bronze/crudos/etiquetas.csv`.
 Desde Databricks se pueden descargar recortes para la presentación. No inventar
 imágenes de evidencia ni incluir datos privados innecesarios al tomar capturas.
@@ -536,7 +536,7 @@ para recrear los gráficos principales.
 | Job | Dos validaciones completas SUCCESS | Preparar historial y ensayo de demo |
 | API con datos reales | Pública en :8000, `fuente_oro=databricks` | Volver a comprobar el día de la presentación |
 | URL y QR | `http://159.65.111.14:8000/docs` responde | Probar desde un teléfono |
-| S3 externo | Ubicaciones de solo lectura; SQL warehouse aprobado el 13/11 | Ninguna |
+| S3 externo | Fotos leídas por `xloc-raw`; escritura en `xloc-cusn/ag/au` aún de solo lectura (16/11) | Si el catedrático la habilita, llenar las rutas `s3://` del Job |
 | Predicción | Objetivo 10/11/2026 | Mantener la fecha mientras no cambie el histórico |
 | Capturas y grabación | Enlaces de evidencia disponibles; grabación no creada | Guardar material de respaldo real |
 | Exposición | Reparto sugerido | Ajustar responsables y ensayar los diez minutos |

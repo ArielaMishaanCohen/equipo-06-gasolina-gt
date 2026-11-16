@@ -2,7 +2,8 @@
 # MAGIC %md
 # MAGIC # 01_bronze — Ingesta incremental de fotos y fuentes complementarias (Fase 1)
 # MAGIC
-# MAGIC 1. Lee las fotos de `ruta_fotos` (por defecto el Volume `crudos/fotos/`) con **Auto Loader**
+# MAGIC 1. Lee las fotos de `ruta_fotos` (por defecto `s3://…-raw-…/img/`, la carpeta del catedrático,
+# MAGIC    a través de la external location `xloc-raw`) con **Auto Loader**
 # MAGIC    (`cloudFiles.format = binaryFile`, `trigger(availableNow=True)`) y las agrega a
 # MAGIC    `bronze.fotos_precios` (contrato 5.1) con `_ingestion_timestamp`, `_source_file` y
 # MAGIC    `fecha_carpeta`. El checkpoint recuerda qué archivos ya se cargaron: **una segunda corrida no
@@ -11,16 +12,21 @@
 # MAGIC    tal cual (todo STRING) a tablas `*_raw`, con las mismas columnas de auditoría.
 # MAGIC 3. Verifica: filas en la tabla = fotos en la carpeta y cero `path` duplicados.
 # MAGIC
-# MAGIC Prerrequisito: haber corrido `00_setup.sql`. Todo lo que cambia llega como widget
+# MAGIC Crea su esquema y su tabla si no existen. Todo lo que cambia llega como widget
 # MAGIC (parámetros del Job). Si Auto Loader no está disponible, `modo = batch_merge` usa
 # MAGIC `binaryFile` + `MERGE` por `path`.
 
 # COMMAND ----------
 
 dbutils.widgets.text("catalogo", "workspace")
-dbutils.widgets.text("esquema_bronze", "equipo6_bronze")
-dbutils.widgets.text("ruta_fotos", "/Volumes/workspace/equipo6_bronze/crudos/fotos/")
+dbutils.widgets.text("esquema_bronze", "equipo_06_bronze")
+# Carpeta compartida de fotos del catedrático, leída por la external location xloc-raw (solo lectura).
+dbutils.widgets.text("ruta_fotos", "s3://cc3105-raw-869227452861-us-east-2-an/img/")
+# Archivos de trabajo del equipo: complementarias/ (MEM, FRED) y _checkpoints/ de Auto Loader.
 dbutils.widgets.text("ruta_equipo_bronze", "/Volumes/workspace/equipo6_bronze/crudos")
+# Dónde viven las tablas Delta de Bronce: vacío = gestionadas; s3://<bucket-bronce>/equipo6 = externas.
+dbutils.widgets.text("ruta_tablas_bronze", "")
+dbutils.widgets.text("checkpoint", "")  # vacío = <ruta_equipo_bronze>/_checkpoints/<esquema>/fotos_precios/
 dbutils.widgets.text("ruta_repo", "")  # carpeta del Git folder (solo informativo / %pip install)
 dbutils.widgets.dropdown("modo", "autoloader", ["autoloader", "batch_merge"])
 
@@ -30,26 +36,47 @@ RUTA_FOTOS = dbutils.widgets.get("ruta_fotos")
 RUTA_EQUIPO = dbutils.widgets.get("ruta_equipo_bronze").rstrip("/")
 RUTA_REPO = dbutils.widgets.get("ruta_repo")
 MODO = dbutils.widgets.get("modo")
-# Con s3:// las tablas *_raw son externas en esa ruta; con un Volume son gestionadas.
-EXTERNAS = RUTA_EQUIPO.startswith("s3://")
+# Compatibilidad: antes la misma ruta_equipo_bronze en s3:// hacía externas las tablas.
+RUTA_TABLAS = (dbutils.widgets.get("ruta_tablas_bronze").strip().rstrip("/")
+               or (RUTA_EQUIPO if RUTA_EQUIPO.startswith("s3://") else ""))
+EXTERNAS = bool(RUTA_TABLAS)
 
 TABLA = f"{CATALOGO}.{ESQUEMA}.fotos_precios"
-CHECKPOINT = f"{RUTA_EQUIPO}/_checkpoints/fotos_precios/"
+# Un checkpoint por esquema: así un esquema nuevo no hereda la memoria de otro.
+CHECKPOINT = (dbutils.widgets.get("checkpoint").strip()
+              or f"{RUTA_EQUIPO}/_checkpoints/{ESQUEMA}/fotos_precios/")
 RUTA_COMPLEMENTARIAS = f"{RUTA_EQUIPO}/complementarias"
 PATRON_FOTOS = "*.{jpg,jpeg,png,heic,JPG,JPEG,PNG,HEIC}"
 
-print(f"Tabla: {TABLA}\nFotos: {RUTA_FOTOS}\nCheckpoint: {CHECKPOINT}\nModo: {MODO}")
+print(f"Tabla: {TABLA} ({'externa en ' + RUTA_TABLAS if EXTERNAS else 'gestionada'})\n"
+      f"Fotos: {RUTA_FOTOS}\nCheckpoint: {CHECKPOINT}\nModo: {MODO}")
 
 # COMMAND ----------
 
 # MAGIC %md ## 1. Fotos → `bronze.fotos_precios`
+# MAGIC Esquema y tabla se crean si no existen (idempotente), con `LOCATION` si `ruta_tablas_bronze`
+# MAGIC es una ruta `s3://` de la external location del bucket Bronce.
 
 # COMMAND ----------
 
 from pyspark.sql import functions as F
 
-if not spark.catalog.tableExists(TABLA):
-    raise RuntimeError(f"No existe {TABLA}. Corre primero pipelines/00_setup.sql.")
+spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOGO}.{ESQUEMA} "
+          "COMMENT 'Equipo 06 - capa Bronce: fotos tal como llegan'")
+spark.sql(f"""
+CREATE TABLE IF NOT EXISTS {TABLA} (
+  path                 STRING    COMMENT 'Ruta completa de la foto (llave natural)',
+  modificationTime     TIMESTAMP COMMENT 'Fecha de modificación del archivo',
+  length               BIGINT    COMMENT 'Tamaño en bytes',
+  content              BINARY    COMMENT 'Contenido binario de la foto',
+  fecha_carpeta        DATE      COMMENT 'Fecha de la carpeta fotos/AAAA-MM-DD/ si existe (si no, NULL: la fecha sale del EXIF en Plata)',
+  _ingestion_timestamp TIMESTAMP COMMENT 'Fecha y hora de la carga a Bronce',
+  _source_file         STRING    COMMENT 'Ruta de la foto de origen'
+)
+USING DELTA
+{f"LOCATION '{RUTA_TABLAS}/bronze/fotos_precios'" if EXTERNAS else ""}
+COMMENT 'Fotos de precios tal como llegan (carpeta del catedrático en S3), con columnas de auditoría. Carga incremental (Auto Loader).'
+""")
 
 
 def con_auditoria(df):
@@ -158,7 +185,7 @@ for tabla, carpeta, patron, descripcion in COMPLEMENTARIAS:
     )
     (
         df.write.format("delta").mode("overwrite").option("overwriteSchema", "true")
-        .options(**({"path": f"{RUTA_EQUIPO}/bronze/{tabla}"} if EXTERNAS else {}))
+        .options(**({"path": f"{RUTA_TABLAS}/bronze/{tabla}"} if EXTERNAS else {}))
         .saveAsTable(destino)
     )
     spark.sql(f"COMMENT ON TABLE {destino} IS '{descripcion} Columnas de auditoría: _ingestion_timestamp, _source_file.'")

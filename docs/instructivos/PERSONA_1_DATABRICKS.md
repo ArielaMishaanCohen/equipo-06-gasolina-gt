@@ -14,7 +14,7 @@ Los archivos de tu entrega son:
 - `tests/test_silver_extraccion.py`: pruebas de integración con OCR simulado.
 
 Pide al equipo de Datos confirmar que `00_setup.sql` y `01_bronze.py` ya corrieron, que
-`workspace.equipo6_bronze.fotos_precios` tiene fotos y que tienes permiso de escritura en Plata.
+`workspace.equipo_06_bronze.fotos_precios` tiene fotos y que tienes permiso de escritura en Plata.
 Usa esos nombres, que son los del código y configuración actuales; algunas guías antiguas
 escriben `equipo_06`, pero ese no es el valor predeterminado actual.
 
@@ -81,8 +81,8 @@ Ejecuta la celda que crea widgets. En la parte superior del notebook configura:
 | Widget | Valor inicial |
 | --- | --- |
 | `catalogo` | `workspace` |
-| `esquema_bronze` | `equipo6_bronze` |
-| `esquema_silver` | `equipo6_silver` |
+| `esquema_bronze` | `equipo_06_bronze` |
+| `esquema_silver` | `equipo_06_silver` |
 | `motor` | `rapidocr` |
 | `preproc` | `gris_clahe` |
 | `reprocesar` | `false` |
@@ -132,15 +132,15 @@ En una nueva celda SQL del notebook ejecuta:
 
 ```sql
 %sql
-SELECT COUNT(*) AS fotos FROM workspace.equipo6_bronze.fotos_precios;
+SELECT COUNT(*) AS fotos FROM workspace.equipo_06_bronze.fotos_precios;
 
 SELECT combustible, COUNT(*) AS lecturas
-FROM workspace.equipo6_silver.precios GROUP BY combustible;
+FROM workspace.equipo_06_silver.precios GROUP BY combustible;
 
 SELECT regla, motivo, COUNT(*) AS rechazos
-FROM workspace.equipo6_silver.precios_rejected GROUP BY regla, motivo;
+FROM workspace.equipo_06_silver.precios_rejected GROUP BY regla, motivo;
 
-SELECT * FROM workspace.equipo6_silver.precios ORDER BY fecha DESC LIMIT 20;
+SELECT * FROM workspace.equipo_06_silver.precios ORDER BY fecha DESC LIMIT 20;
 ```
 
 Vuelve a correr el notebook con `reprocesar=false`. Si no llegaron fotos nuevas y no cambió

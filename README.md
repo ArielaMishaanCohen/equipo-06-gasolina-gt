@@ -18,13 +18,13 @@ en un Droplet de DigitalOcean.
 Editable en [app.diagrams.net](https://app.diagrams.net) con `docs/arquitectura.drawio`; se regenera con `python scripts/generar_arquitectura.py`. Resumen en texto:
 
 ```
-Volume crudos/fotos/  ──►  BRONCE  workspace.equipo6_bronze   bronze.fotos_precios (Auto Loader, incremental)
- (fotos del catedrático)       │
+s3://…-raw-…/img/  ──►  BRONCE  workspace.equipo_06_bronze  bronze.fotos_precios (Auto Loader, incremental)
+ (xloc-raw: fotos del catedrático)│
                                ▼  OCR + 5 reglas de calidad + MERGE
-                             PLATA   workspace.equipo6_silver   silver.precios, silver.precios_rejected
+                             PLATA   workspace.equipo_06_silver   silver.precios, silver.precios_rejected
                                │
                                ▼  semana martes-lunes, variación, features, modelo (MLflow)
-                             ORO     workspace.equipo6_gold     gold.precio_semanal, variacion_semanal,
+                             ORO     workspace.equipo_06_gold     gold.precio_semanal, variacion_semanal,
                                │                                features_modelo, predicciones, metricas_modelo
                                ▼  SQL warehouse (token de Databricks en el .env del servidor)
                              API FastAPI en el Droplet (uv) ◄── usuario (HTTP) · equipo (SSH) · GitHub Actions (CD)
@@ -32,8 +32,17 @@ Volume crudos/fotos/  ──►  BRONCE  workspace.equipo6_bronze   bronze.fotos
 
 Databricks: Job `equipo-06-pipeline` con tres tareas encadenadas, cómputo serverless con entorno
 versión 2, programación los martes a las 07:00 de Guatemala y alertas de fallo por correo.
-Los notebooks se desarrollan en el workspace con serverless. Las tablas actuales son gestionadas
-y la API puede consultarlas mediante SQL warehouse. Las ubicaciones S3 del curso son de solo lectura.
+
+**S3 y external locations.** Bronce lee las fotos directamente de la carpeta del catedrático
+(`s3://cc3105-raw-…/img/`, 110 fotos de 2023 a 2026) por la external location `xloc-raw` de Unity
+Catalog, con su storage credential (rol IAM). Las tablas se escriben en los esquemas
+`workspace.equipo_06_*`. Cada notebook acepta una ruta `s3://` por capa (`ruta_tablas_bronze`,
+`ruta_equipo_silver`, `ruta_equipo_oro`): con ella, sus tablas se crean como **externas** en el
+prefijo `equipo6/` del bucket de su capa (`xloc-cusn`, `xloc-ag`, `xloc-au`). Al 16 de noviembre esas
+tres ubicaciones siguen marcadas como solo lectura en el metastore (Databricks responde
+`User cannot write to a read-only external location`), así que las tablas son gestionadas; en cuanto
+se habilite la escritura basta con llenar esos tres parámetros del Job. La API lee Oro con el SQL
+warehouse y ya trae la lectura directa desde S3 (`ORO_S3_PREFIX`) para ese momento.
 
 ## Estructura
 
@@ -44,14 +53,15 @@ y la API puede consultarlas mediante SQL warehouse. Las ubicaciones S3 del curso
 | `api/` | Punto de entrada de la API, `.env.example` y documentación del entorno |
 | `config/config.yaml` | Valores que cambian (equipo, rutas S3, esquemas, umbral, puerto) |
 | `tests/` | `pytest` (API y contratos) y `consultas_api.sh` (prueba de usuario final) |
-| `scripts/` | `deploy.sh`, `fin_de_clase.sh`, `servidor_check.sh`, `generar_oro_demo.py` |
+| `scripts/` | `deploy.sh`, `fin_de_clase.sh`, `servidor_check.sh`, `generar_oro_demo.py`, `dbx_job.py` (aplicar, revertir o correr el Job) |
 | `docker/` | Imagen de la API (la construye el CI y se publica en GHCR) |
 | `docs/`, `presentacion/` | Diagrama, informe, enunciado, instructivos, diapositivas y resumen para el jurado |
 
 ## Reproducir el pipeline (Databricks)
 
 1. Workspace → Create → Git folder con este repo.
-2. Correr `pipelines/00_setup.sql` una vez (esquemas y tablas externas).
+2. Correr `pipelines/00_setup.sql` una vez (esquemas, Volume de trabajo y permisos). Las tablas las
+   crea cada notebook si no existen.
 3. Seleccionar el entorno serverless **versión 2** para las dependencias de estos notebooks.
    Ejecutar `01_bronze` → `02_silver` → `03_gold`, o el Job `equipo-06-pipeline` con **Run now**.
    La definición exportada está en `pipelines/job.json` y las evidencias en `docs/evidencias_job.md`.
@@ -70,10 +80,11 @@ bash scripts/deploy.sh
 cerrar SSH), agrega `@reboot` al crontab y espera a que `/health` responda. También se puede correr
 desde GitHub: Actions → `deploy` → Run workflow.
 
-**Por qué uv y no Docker en el Droplet:** Docker necesita instalar paquetes del sistema con sudo, y
-el enunciado prohíbe instalar paquetes a nivel de sistema. uv vive en el usuario y garantiza las
-mismas versiones con `uv.lock`. La imagen Docker existe igual: el CI la construye y la publica en
-GHCR para correr la API en cualquier máquina con Docker.
+**Por qué uv en el Droplet:** el servidor es compartido entre equipos y uv vive en el usuario
+(`~/apps/gasolina-mlops/.venv`), sin tocar nada del sistema ni de los demás equipos, y garantiza las
+mismas versiones con `pyproject.toml` y `uv.lock`. Arranca en segundos y `deploy.sh` lo deja vivo al
+cerrar SSH y al reiniciar. Además existe la opción Docker: el CI construye la imagen y la publica en
+GHCR, y `docker-compose.yml` la levanta con `restart: unless-stopped` (`deploy.sh --modo docker`).
 
 ## Desarrollo local
 

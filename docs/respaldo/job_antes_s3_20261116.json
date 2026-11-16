@@ -1,0 +1,156 @@
+{
+  "name": "equipo-06-pipeline",
+  "description": "Pipeline medallón del Equipo 06: Bronce (fotos y fuentes complementarias) -> Plata (precios, reglas de calidad, cuarentena) -> Oro (indicadores semanales, variables, modelo y predicciones).",
+  "email_notifications": {
+    "on_failure": [
+      "sot22737@uvg.edu.gt",
+      "mis22052@uvg.edu.gt"
+    ]
+  },
+  "webhook_notifications": {},
+  "timeout_seconds": 7200,
+  "schedule": {
+    "quartz_cron_expression": "0 0 7 ? * TUE",
+    "timezone_id": "America/Guatemala",
+    "pause_status": "UNPAUSED"
+  },
+  "max_concurrent_runs": 1,
+  "tasks": [
+    {
+      "task_key": "bronze",
+      "run_if": "ALL_SUCCESS",
+      "notebook_task": {
+        "notebook_path": "/Shared/Proyecto/Notebooks/Pipeline_entrega_20261115/01_bronze",
+        "source": "WORKSPACE"
+      },
+      "timeout_seconds": 3600,
+      "email_notifications": {},
+      "description": "Ingesta incremental de fotos (Auto Loader, binaryFile) y fuentes complementarias a Bronce.",
+      "environment_key": "gasolina_validado",
+      "disabled": false
+    },
+    {
+      "task_key": "silver",
+      "depends_on": [
+        {
+          "task_key": "bronze"
+        }
+      ],
+      "run_if": "ALL_SUCCESS",
+      "notebook_task": {
+        "notebook_path": "/Shared/Proyecto/Notebooks/Pipeline_entrega_20261115/02_silver",
+        "source": "WORKSPACE"
+      },
+      "timeout_seconds": 3600,
+      "email_notifications": {},
+      "description": "Extracción de precios, reglas de calidad, MERGE en silver.precios y cuarentena en silver.precios_rejected.",
+      "environment_key": "gasolina_validado",
+      "disabled": false
+    },
+    {
+      "task_key": "gold",
+      "depends_on": [
+        {
+          "task_key": "silver"
+        }
+      ],
+      "run_if": "ALL_SUCCESS",
+      "notebook_task": {
+        "notebook_path": "/Shared/Proyecto/Notebooks/Pipeline_entrega_20261115/03_gold",
+        "source": "WORKSPACE"
+      },
+      "timeout_seconds": 3600,
+      "email_notifications": {},
+      "description": "Precio semanal (martes a lunes), variación, variables del modelo, modelo y predicciones.",
+      "environment_key": "gasolina_validado",
+      "disabled": false
+    }
+  ],
+  "tags": {
+    "codigo": "Workspace-copia-repositorio",
+    "equipo": "06",
+    "proyecto": "gasolina"
+  },
+  "format": "MULTI_TASK",
+  "queue": {
+    "enabled": true
+  },
+  "parameters": [
+    {
+      "name": "catalogo",
+      "default": "workspace"
+    },
+    {
+      "name": "esquema_bronze",
+      "default": "equipo6_bronze"
+    },
+    {
+      "name": "esquema_silver",
+      "default": "equipo6_silver"
+    },
+    {
+      "name": "esquema_gold",
+      "default": "equipo6_gold"
+    },
+    {
+      "name": "ruta_fotos",
+      "default": "/Volumes/workspace/equipo6_bronze/crudos/fotos/"
+    },
+    {
+      "name": "ruta_equipo_bronze",
+      "default": "/Volumes/workspace/equipo6_bronze/crudos"
+    },
+    {
+      "name": "ruta_equipo_silver",
+      "default": ""
+    },
+    {
+      "name": "ruta_equipo_oro",
+      "default": ""
+    },
+    {
+      "name": "ruta_repo",
+      "default": ""
+    },
+    {
+      "name": "modo",
+      "default": "autoloader"
+    },
+    {
+      "name": "motor",
+      "default": "rapidocr"
+    },
+    {
+      "name": "preproc",
+      "default": "gris_clahe"
+    },
+    {
+      "name": "umbral_q",
+      "default": "0.10"
+    },
+    {
+      "name": "modalidad_mem",
+      "default": "autoservicio"
+    },
+    {
+      "name": "ruta_etiquetas",
+      "default": "/Volumes/workspace/equipo6_bronze/crudos/etiquetas.csv"
+    },
+    {
+      "name": "ruta_reporte_exactitud",
+      "default": "/Volumes/workspace/equipo6_bronze/crudos/reportes/exactitud_job"
+    },
+    {
+      "name": "reprocesar",
+      "default": "false"
+    }
+  ],
+  "environments": [
+    {
+      "environment_key": "gasolina_validado",
+      "spec": {
+        "environment_version": "2"
+      }
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 {
   "name": "equipo-06-pipeline",
-  "description": "Pipeline medallón del Equipo 06: Bronce (fotos y fuentes complementarias) -> Plata (precios, reglas de calidad, cuarentena) -> Oro (indicadores semanales, variables, modelo y predicciones).",
+  "description": "Pipeline medallón del Equipo 06: Bronce (fotos y fuentes complementarias) -> Plata (precios, reglas de calidad, cuarentena) -> Oro (indicadores semanales, variables, modelo y predicciones). Las fotos se leen de la carpeta del catedrático en S3 (external location xloc-raw).",
   "email_notifications": {
     "on_failure": [
       "sot22737@uvg.edu.gt",
@@ -20,14 +20,14 @@
       "task_key": "bronze",
       "run_if": "ALL_SUCCESS",
       "notebook_task": {
-        "notebook_path": "/Shared/Proyecto/Notebooks/Pipeline_entrega_20261115/01_bronze",
+        "notebook_path": "/Shared/Proyecto/Notebooks/Pipeline_s3_20261116/01_bronze",
         "source": "WORKSPACE"
       },
       "timeout_seconds": 3600,
       "email_notifications": {},
       "description": "Ingesta incremental de fotos (Auto Loader, binaryFile) y fuentes complementarias a Bronce.",
-      "disabled": false,
-      "environment_key": "gasolina_validado"
+      "environment_key": "gasolina_validado",
+      "disabled": false
     },
     {
       "task_key": "silver",
@@ -38,14 +38,14 @@
       ],
       "run_if": "ALL_SUCCESS",
       "notebook_task": {
-        "notebook_path": "/Shared/Proyecto/Notebooks/Pipeline_entrega_20261115/02_silver",
+        "notebook_path": "/Shared/Proyecto/Notebooks/Pipeline_s3_20261116/02_silver",
         "source": "WORKSPACE"
       },
       "timeout_seconds": 3600,
       "email_notifications": {},
       "description": "Extracción de precios, reglas de calidad, MERGE en silver.precios y cuarentena en silver.precios_rejected.",
-      "disabled": false,
-      "environment_key": "gasolina_validado"
+      "environment_key": "gasolina_validado",
+      "disabled": false
     },
     {
       "task_key": "gold",
@@ -56,18 +56,18 @@
       ],
       "run_if": "ALL_SUCCESS",
       "notebook_task": {
-        "notebook_path": "/Shared/Proyecto/Notebooks/Pipeline_entrega_20261115/03_gold",
+        "notebook_path": "/Shared/Proyecto/Notebooks/Pipeline_s3_20261116/03_gold",
         "source": "WORKSPACE"
       },
       "timeout_seconds": 3600,
       "email_notifications": {},
       "description": "Precio semanal (martes a lunes), variación, variables del modelo, modelo y predicciones.",
-      "disabled": false,
-      "environment_key": "gasolina_validado"
+      "environment_key": "gasolina_validado",
+      "disabled": false
     }
   ],
   "tags": {
-    "codigo": "Workspace-copia-repositorio",
+    "codigo": "Workspace-copia-repositorio-s3",
     "equipo": "06",
     "proyecto": "gasolina"
   },
@@ -82,23 +82,27 @@
     },
     {
       "name": "esquema_bronze",
-      "default": "equipo6_bronze"
+      "default": "equipo_06_bronze"
     },
     {
       "name": "esquema_silver",
-      "default": "equipo6_silver"
+      "default": "equipo_06_silver"
     },
     {
       "name": "esquema_gold",
-      "default": "equipo6_gold"
+      "default": "equipo_06_gold"
     },
     {
       "name": "ruta_fotos",
-      "default": "/Volumes/workspace/equipo6_bronze/crudos/fotos/"
+      "default": "s3://cc3105-raw-869227452861-us-east-2-an/img/"
     },
     {
       "name": "ruta_equipo_bronze",
       "default": "/Volumes/workspace/equipo6_bronze/crudos"
+    },
+    {
+      "name": "ruta_tablas_bronze",
+      "default": ""
     },
     {
       "name": "ruta_equipo_silver",
@@ -138,7 +142,7 @@
     },
     {
       "name": "ruta_reporte_exactitud",
-      "default": "/Volumes/workspace/equipo6_bronze/crudos/reportes/exactitud_job"
+      "default": "/Volumes/workspace/equipo6_bronze/crudos/reportes/exactitud_job_equipo_06"
     },
     {
       "name": "reprocesar",

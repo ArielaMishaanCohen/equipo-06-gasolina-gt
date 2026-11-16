@@ -219,7 +219,7 @@ def diapositivas():
         "Fotos y referencias de evaluación",
         "Daniel describe el conjunto y la verdad manual. 1 minuto.",
     )
-    parrafo(c, "38 fotos oficiales en Bronce", 44, 395, 850, 29, negrita=True)
+    parrafo(c, "110 fotos oficiales leídas de S3 a Bronce", 44, 395, 850, 29, negrita=True)
     parrafo(c, "36 fotos etiquetadas y 85 precios legibles", 44, 300, 850, 26)
     parrafo(c, "La evaluación exige una diferencia menor que Q0.005.", 44, 195, 850, 22)
     parrafo(c, "Combustibles incluidos: súper, regular y diésel.", 44, 118, 850, 22)
@@ -239,8 +239,11 @@ def diapositivas():
     parrafo(c, "RapidOCR con gris_clahe acertó 78 de los 85 precios.", 44, 100, 850, 21)
 
     nueva("Validación de los precios", "Daniel muestra los errores y explica cuarentena. 1 minuto.")
-    parrafo(c, "93 registros aceptados y 3 rechazados", 44, 400, 850, 29, negrita=True)
-    parrafo(c, "Dos fotos sin precios legibles y una lectura con baja confianza.", 44, 305, 850, 23)
+    parrafo(c, "221 registros aceptados y 26 rechazados", 44, 400, 850, 29, negrita=True)
+    parrafo(
+        c, "14 sin precios legibles, 6 inconsistentes, 5 con baja confianza, 1 fuera de rango",
+        44, 305, 850, 23,
+    )
     parrafo(c, "Ejemplo: regular Q35.16 se leyó como Q35.76.", 44, 210, 850, 23)
     parrafo(c, "Las reglas controlan rango, combustible, fecha y confianza.", 44, 115, 850, 22)
 
@@ -301,7 +304,8 @@ def diapositivas():
     parrafo(c, "El histórico termina el 3 de noviembre de 2026.", 44, 400, 850, 24)
     parrafo(c, "Las predicciones disponibles corresponden al 10 de noviembre.", 44, 315, 850, 24)
     parrafo(
-        c, "La infraestructura actual usa tablas gestionadas y lectura por SQL.", 44, 225, 850, 23
+        c, "Fotos leídas por external location; tablas gestionadas y lectura por SQL.",
+        44, 225, 850, 23,
     )
     parrafo(
         c,

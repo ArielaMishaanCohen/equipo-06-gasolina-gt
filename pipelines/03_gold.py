@@ -5,7 +5,7 @@
 # MAGIC Partes: (1) `precio_semanal`, `variacion_semanal` y `features_modelo` —
 # MAGIC **Datos**; (2) entrenamiento con MLflow, `predicciones` y `metricas_modelo` — **Modelos**.
 # MAGIC Contrato 5.4 de `docs/instructivos/INSTRUCTIVO_GENERAL.md`: la API del servidor lee estas
-# MAGIC tablas (`workspace.equipo6_gold.<tabla>`, vía SQL warehouse), así que los nombres de
+# MAGIC tablas (`workspace.equipo_06_gold.<tabla>`), así que los nombres de
 # MAGIC columnas tienen que ser exactamente esos.
 
 # COMMAND ----------
@@ -44,9 +44,9 @@ dbutils.library.restartPython()
 # COMMAND ----------
 
 dbutils.widgets.text("catalogo", "workspace")
-dbutils.widgets.text("esquema_bronze", "equipo6_bronze")
-dbutils.widgets.text("esquema_silver", "equipo6_silver")
-dbutils.widgets.text("esquema_gold", "equipo6_gold")
+dbutils.widgets.text("esquema_bronze", "equipo_06_bronze")
+dbutils.widgets.text("esquema_silver", "equipo_06_silver")
+dbutils.widgets.text("esquema_gold", "equipo_06_gold")
 dbutils.widgets.text("ruta_equipo_oro", "")  # vacío = tablas gestionadas; s3://… = externas
 dbutils.widgets.text("umbral_q", "0.10")
 dbutils.widgets.text("modalidad_mem", "autoservicio")
@@ -57,6 +57,8 @@ SILVER = f"{CATALOGO}.{dbutils.widgets.get('esquema_silver')}"
 GOLD = f"{CATALOGO}.{dbutils.widgets.get('esquema_gold')}"
 RUTA_EQUIPO_ORO = dbutils.widgets.get("ruta_equipo_oro").strip().rstrip("/")
 RUTA_GOLD = f"{RUTA_EQUIPO_ORO}/gold" if RUTA_EQUIPO_ORO else ""  # <ruta>/gold/<tabla>/ si es S3
+spark.sql(f"CREATE SCHEMA IF NOT EXISTS {GOLD} "
+          "COMMENT 'Equipo 06 - capa Oro: indicadores semanales, modelo y predicciones'")
 UMBRAL_Q = float(dbutils.widgets.get("umbral_q"))
 MODALIDAD_MEM = dbutils.widgets.get("modalidad_mem")
 
@@ -148,6 +150,12 @@ def _py(v):
 
 
 def a_spark(pdf: pd.DataFrame, esquema: StructType):
+    pdf = pdf.copy()
+    # Las filas previas (leídas de Spark) traen timestamps sin zona y las nuevas en UTC; Spark
+    # Connect no acepta timestamps sin zona al crear el DataFrame. Todo se normaliza a UTC.
+    for campo in esquema.fields:
+        if campo.dataType.typeName() == "timestamp":
+            pdf[campo.name] = pd.to_datetime(pdf[campo.name], utc=True)
     filas = [tuple(_py(v) for v in fila) for fila in pdf[esquema.fieldNames()].itertuples(
         index=False, name=None)]
     return spark.createDataFrame(filas, esquema)
