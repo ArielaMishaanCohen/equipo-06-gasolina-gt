@@ -1,6 +1,6 @@
 # Capturas de evidencia
 
-Tomadas el 15 de noviembre de 2026 contra el servidor real (`http://159.65.111.14:8000`).
+Tomadas el 16 de noviembre de 2026 (esquemas `equipo_06_*`, 110 fotos) contra el servidor real (`http://159.65.111.14:8000`).
 El video de respaldo de la demo (`demo_api_respaldo.mp4`, 87 s) no está en Git por su tamaño.
 
 ## API y panel (generadas automáticamente)

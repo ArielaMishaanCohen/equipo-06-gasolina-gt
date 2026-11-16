@@ -8,7 +8,7 @@ GET http://159.65.111.14:8000/health
     "tablas": {
         "precio_semanal": {
             "fuente": "databricks",
-            "filas": 345,
+            "filas": 461,
             "ultima": "2026-11-03"
         },
         "variacion_semanal": {
@@ -29,11 +29,11 @@ GET http://159.65.111.14:8000/health
         "metricas_modelo": {
             "fuente": "databricks",
             "filas": 3,
-            "ultima": "2026-11-15"
+            "ultima": "2026-11-16"
         }
     },
     "entorno": "servidor",
-    "hora_servidor": "2026-11-15T17:28:31-06:00"
+    "hora_servidor": "2026-11-16T17:06:11-06:00"
 }
 -> HTTP 200
 
@@ -159,7 +159,7 @@ GET http://159.65.111.14:8000/precios?combustible=diesel&desde=2026-10-01&hasta=
 === Métricas del modelo vs. línea base
 GET http://159.65.111.14:8000/modelo/metricas
 {
-    "fecha_entrenamiento": "2026-11-15",
+    "fecha_entrenamiento": "2026-11-16",
     "modelo": "regresion_logistica",
     "version_modelo": "0.2.0",
     "accuracy_modelo": 0.6,
@@ -168,7 +168,7 @@ GET http://159.65.111.14:8000/modelo/metricas
     "f1_macro_baseline": 0.2564,
     "n_semanas_test": 10,
     "supera_baseline": true,
-    "mlflow_run_id": "826b0bb0449e4e7ba1b19632926065dc",
+    "mlflow_run_id": "650fb0f81d644959a8675142f8812b9c",
     "es_champion": true
 }
 -> HTTP 200
