@@ -150,6 +150,12 @@ def _py(v):
 
 
 def a_spark(pdf: pd.DataFrame, esquema: StructType):
+    pdf = pdf.copy()
+    # Las filas previas (leídas de Spark) traen timestamps sin zona y las nuevas en UTC; Spark
+    # Connect no acepta timestamps sin zona al crear el DataFrame. Todo se normaliza a UTC.
+    for campo in esquema.fields:
+        if campo.dataType.typeName() == "timestamp":
+            pdf[campo.name] = pd.to_datetime(pdf[campo.name], utc=True)
     filas = [tuple(_py(v) for v in fila) for fila in pdf[esquema.fieldNames()].itertuples(
         index=False, name=None)]
     return spark.createDataFrame(filas, esquema)
