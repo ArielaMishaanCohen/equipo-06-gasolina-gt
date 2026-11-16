@@ -37,7 +37,7 @@ dbutils.library.restartPython()
 # COMMAND ----------
 
 dbutils.widgets.text("catalogo", "workspace")
-dbutils.widgets.text("esquema_bronze", "equipo6_bronze")
+dbutils.widgets.text("esquema_bronze", "equipo_06_bronze")
 dbutils.widgets.text("ruta_etiquetas", "")
 dbutils.widgets.text("motores", "rapidocr")  # rapidocr,easyocr si está instalado el extra
 dbutils.widgets.text("run_ids_reutilizar", "")  # corridas FINISHED del mismo conjunto y versión

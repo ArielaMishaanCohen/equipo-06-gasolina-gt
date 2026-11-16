@@ -24,8 +24,8 @@ DEFAULTS: dict = {
     "equipo": {"numero": 6, "prefijo_s3": "equipo6"},
     "databricks": {
         "catalogo": "workspace",
-        "esquemas": {"bronze": "equipo6_bronze", "silver": "equipo6_silver",
-                     "gold": "equipo6_gold"},
+        "esquemas": {"bronze": "equipo_06_bronze", "silver": "equipo_06_silver",
+                     "gold": "equipo_06_gold"},
     },
     "s3": {
         "gold": "s3://cc3105-au-869227452861-us-east-2-an/equipo6",

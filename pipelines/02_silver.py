@@ -42,8 +42,10 @@ dbutils.library.restartPython()
 # COMMAND ----------
 
 dbutils.widgets.text("catalogo", "workspace")
-dbutils.widgets.text("esquema_bronze", "equipo6_bronze")
-dbutils.widgets.text("esquema_silver", "equipo6_silver")
+dbutils.widgets.text("esquema_bronze", "equipo_06_bronze")
+dbutils.widgets.text("esquema_silver", "equipo_06_silver")
+# Vacío = tablas gestionadas. Con s3://<bucket-plata>/equipo6 se crean como externas en esa ruta.
+dbutils.widgets.text("ruta_equipo_silver", "")
 dbutils.widgets.text("motor", "rapidocr")
 dbutils.widgets.text("preproc", "gris_clahe")
 dbutils.widgets.dropdown("reprocesar", "false", ["false", "true"])
@@ -93,9 +95,39 @@ VERSION_MODELO = __version__
 T_FOTOS = f"{BRONZE}.fotos_precios"
 T_PRECIOS = f"{SILVER}.precios"
 T_RECHAZADOS = f"{SILVER}.precios_rejected"
-for tabla in (T_FOTOS, T_PRECIOS, T_RECHAZADOS):
-    if not spark.catalog.tableExists(tabla):
-        raise RuntimeError(f"No existe {tabla}. Ejecuta 00_setup y 01_bronze con Datos.")
+RUTA_SILVER = dbutils.widgets.get("ruta_equipo_silver").strip().rstrip("/")
+
+
+def _location(tabla):
+    """LOCATION de la external location del bucket Plata, o nada (tabla gestionada)."""
+    return f"LOCATION '{RUTA_SILVER}/silver/{tabla}'" if RUTA_SILVER else ""
+
+
+# Esquema y tablas de Plata (contrato 5.3): se crean si no existen, igual que en 00_setup.
+spark.sql(f"CREATE SCHEMA IF NOT EXISTS {SILVER} "
+          "COMMENT 'Equipo 06 - capa Plata: precios limpios y cuarentena'")
+_COLUMNAS_PRECIO = """
+  fecha           DATE          COMMENT 'Fecha de la foto (EXIF; si no hay, la de la carpeta)',
+  combustible     STRING        COMMENT 'super, regular o diesel',
+  precio_q_galon  DECIMAL(6,2)  COMMENT 'Precio en quetzales por galón',
+  modalidad       STRING        COMMENT 'autoservicio, servicio_completo o no_indica',
+  ubicacion       STRING        COMMENT 'Estación o municipio si aparece; si no, no_indica',
+  foto_origen     STRING        COMMENT 'Ruta de la foto en Bronce',
+  confianza       DOUBLE        COMMENT 'Confianza de la lectura (0 a 1)',
+  motor           STRING        COMMENT 'Motor de OCR usado',
+  version_modelo  STRING        COMMENT 'Versión del paquete gasolina que hizo la extracción',
+  _procesado_en   TIMESTAMP     COMMENT 'Fecha y hora del procesamiento'"""
+spark.sql(f"""CREATE TABLE IF NOT EXISTS {T_PRECIOS} ({_COLUMNAS_PRECIO}) USING DELTA
+{_location("precios")}
+COMMENT 'Un precio por fecha, ubicación, combustible y modalidad. Cargada con MERGE (idempotente).'""")
+spark.sql(f"""CREATE TABLE IF NOT EXISTS {T_RECHAZADOS} ({_COLUMNAS_PRECIO},
+  regla           STRING        COMMENT 'Regla de calidad que falló',
+  motivo          STRING        COMMENT 'Explicación del rechazo') USING DELTA
+{_location("precios_rejected")}
+COMMENT 'Cuarentena: lecturas que no pasaron las reglas de calidad, con el motivo.'""")
+
+if not spark.catalog.tableExists(T_FOTOS):
+    raise RuntimeError(f"No existe {T_FOTOS}. Ejecuta primero 01_bronze.")
 
 # Prueba real de importación y del motor, primero en driver y luego en un worker.
 dependencias_driver = comprobar_dependencias(MOTOR)
@@ -154,7 +186,9 @@ extraer_particion = partial(extraer_lote, motor=MOTOR, preproc=PREPROC,
 # y, sin materializar, "pendientes" se recalcularía vacío después del MERGE).
 T_EXTRACCION = f"{SILVER}._extraccion_corrida"
 (pendientes.mapInPandas(extraer_particion, ESQUEMA_RESULTADOS)
- .write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(T_EXTRACCION))
+ .write.mode("overwrite").option("overwriteSchema", "true")
+ .options(**({"path": f"{RUTA_SILVER}/silver/_extraccion_corrida"} if RUTA_SILVER else {}))
+ .saveAsTable(T_EXTRACCION))
 extraidas = spark.table(T_EXTRACCION)
 print(f"Fotos extraídas: {extraidas.count()}")
 
@@ -247,8 +281,7 @@ else:
 
 # COMMAND ----------
 
-# Vacío = tabla gestionada (workspace propio). Con s3://… se crea como externa en esa ruta.
-dbutils.widgets.text("ruta_equipo_silver", "")
+# Vacío = tabla gestionada. Con s3://… (widget ruta_equipo_silver) se crea como externa.
 RUTA_SILVER = dbutils.widgets.get("ruta_equipo_silver").strip().rstrip("/")
 LOCATION_MEM = f"LOCATION '{RUTA_SILVER}/silver/mem_referencia'" if RUTA_SILVER else ""
 

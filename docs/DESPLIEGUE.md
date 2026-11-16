@@ -29,7 +29,7 @@ ENTORNO=servidor
 ```
 
 La cuenta para la API necesita acceso al warehouse y lectura de las tablas de
-`workspace.equipo6_gold`. Sus credenciales deben tener permisos de lectura sobre Oro.
+`workspace.equipo_06_gold`. Sus credenciales deben tener permisos de lectura sobre Oro.
 Los tokens y las llaves se configuran en el servidor y se excluyen de Git.
 
 ## Desplegar y comprobar

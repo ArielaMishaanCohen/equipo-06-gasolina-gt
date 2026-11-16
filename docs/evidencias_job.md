@@ -55,3 +55,25 @@ La API está publicada en `http://159.65.111.14:8000` (Swagger en `/docs`) y lee
 mediante el SQL warehouse; `/health` responde `fuente_oro=databricks`. Oro sigue en
 tablas gestionadas porque las ubicaciones S3 del curso son de solo lectura; el
 catedrático aprobó el 13 de noviembre el workspace propio con lectura por SQL warehouse.
+
+## Lectura de fotos por external location (16 nov)
+
+Corrida completa con las tres tareas sobre los esquemas `workspace.equipo_06_*`, con las fotos
+leídas directamente de `s3://cc3105-raw-869227452861-us-east-2-an/img/` (external location `xloc-raw`):
+[602882162126731](https://dbc-f51e9943-f137.cloud.databricks.com/?o=1420684327351409#job/35821178713934/run/602882162126731),
+SUCCESS / SUCCESS / SUCCESS en 69 / 732 / 152 s.
+
+| Tabla | Filas |
+| --- | --- |
+| `equipo_06_bronze.fotos_precios` | 110 (= fotos de la carpeta, 0 duplicados) |
+| `equipo_06_silver.precios` | 221 (2023: 37, 2024: 35, 2025: 56, 2026: 93) |
+| `equipo_06_silver.precios_rejected` | 26 (14 sin precios legibles, 6 consistencia, 5 confianza, 1 rango) |
+| `equipo_06_gold.precio_semanal` | 461 (197 de fotos desde dic 2022 + 264 del MEM) |
+
+Exactitud manual sin cambios: 78/85 precios correctos (91.8%) en 36 fotos. Métricas del modelo y
+predicciones idénticas a la corrida anterior, porque el clasificador entrena con la serie del MEM.
+
+La escritura en `xloc-cusn`, `xloc-ag` y `xloc-au` se probó el mismo día y Databricks respondió
+`PERMISSION_DENIED: User cannot write to a read-only external location`. Por eso las tablas siguen
+gestionadas. Respaldo del Job anterior: [`respaldo/job_antes_s3_20261116.json`](respaldo/job_antes_s3_20261116.json);
+`python scripts/dbx_job.py aplicar | revertir | correr`.

@@ -12,7 +12,7 @@ La arquitectura medallón conserva las fotos y sus metadatos en Bronce, aplica O
 
 ![Arquitectura del proyecto](arquitectura.png)
 
-El workspace contiene 38 fotos oficiales en un Volume de Unity Catalog. Las tablas actuales son Delta gestionadas. Las ubicaciones S3 del curso están marcadas como solo lectura. El código admite rutas externas cuando exista una external location con escritura autorizada. La API puede consultar las tablas gestionadas mediante un SQL warehouse de Databricks.
+Bronce lee las 110 fotos oficiales (2023 a 2026) directamente de `s3://cc3105-raw-…/img/` mediante la external location `xloc-raw` de Unity Catalog y su storage credential. Las tablas viven en los esquemas `workspace.equipo_06_bronze`, `equipo_06_silver` y `equipo_06_gold`. Cada notebook acepta una ruta `s3://` por capa para crear sus tablas como externas en el bucket de su capa; al 16 de noviembre `xloc-cusn`, `xloc-ag` y `xloc-au` siguen marcadas como solo lectura, por lo que las tablas son Delta gestionadas. La API consulta Oro mediante un SQL warehouse de Databricks y admite la lectura directa desde S3 cuando exista esa escritura.
 
 <!-- pagebreak -->
 
@@ -31,7 +31,7 @@ La evaluación utiliza las etiquetas existentes del equipo para 36 fotos y 85 pr
 
 La configuración elegida es RapidOCR con gris_clahe. Presentó seis valores incorrectos y un precio no encontrado. Se observaron diez lecturas adicionales sin etiqueta y cero salidas duplicadas para llaves etiquetadas. Los resultados por foto y las corridas se conservaron en MLflow.
 
-Plata contiene 93 filas aceptadas y tres rechazos. Dos corresponden a fotos sin precios legibles y uno a confianza inferior al umbral. La proporción de filas rechazadas es 3/96, equivalente a 3.125%. Las reglas verifican rango de Q20 a Q60, combustible válido, fecha no futura, confianza mínima y consistencia de gasolinas. La carga utiliza MERGE con fecha, ubicación, combustible y modalidad como llave.
+Plata contiene 221 filas aceptadas de 2023 a 2026 y 26 rechazos: 14 fotos sin precios legibles, 6 por consistencia entre gasolinas, 5 por confianza inferior al umbral y 1 fuera de rango. La proporción de filas rechazadas es 26/247, equivalente a 10.5%. Las fotos de 2026 producen los mismos 93 registros que en la primera carga. Las reglas verifican rango de Q20 a Q60, combustible válido, fecha no futura, confianza mínima y consistencia de gasolinas. La carga utiliza MERGE con fecha, ubicación, combustible y modalidad como llave.
 
 | Foto | Referencia manual | Resultado incorrecto |
 | --- | --- | --- |
@@ -91,7 +91,7 @@ Se probaron siete casos de consulta de la API desde este entorno contra las tabl
 
 La última semana del histórico comienza el 3 de noviembre, por lo que la predicción disponible corresponde al 10. El equipo indicó que no contará con datos de esa semana para generar la predicción del 17. La fecha objetivo se conserva según los datos disponibles.
 
-Las tablas gestionadas permiten trabajar con la infraestructura disponible. Para publicar tablas externas en otro bucket S3 hace falta una ruta con escritura y una external location autorizada. Las tablas externas no pueden superponerse al almacenamiento gestionado de Unity Catalog. El 13 de noviembre el catedrático aprobó trabajar en el workspace propio del equipo con tablas gestionadas y que la API lea Oro mediante el SQL warehouse.
+La lectura de fotos usa la external location del bucket crudo. Para escribir tablas externas hace falta que las external locations de cada capa permitan escritura y `CREATE EXTERNAL TABLE`; el código ya recibe esas rutas como parámetros del Job. Mientras tanto, las tablas gestionadas permiten trabajar con la infraestructura disponible, como aprobó el catedrático el 13 de noviembre, y la API lee Oro mediante el SQL warehouse.
 
 Las principales lecciones fueron conservar las fotos y su trazabilidad, medir la extracción con etiquetas, separar temporalmente entrenamiento y prueba y revisar F1 además de accuracy. También se comprobó que aumentar la resolución puede elevar el consumo de memoria sin mejorar la exactitud.
 

@@ -39,7 +39,7 @@ C = {
 # id: (texto, x, y, ancho, alto, estilo, es_contenedor)
 NODOS = {
     # Contenedores
-    "aws": ("Unity Catalog · catálogo workspace · tablas Delta gestionadas + Volume",
+    "aws": ("AWS S3 + Unity Catalog · storage credential + external locations · catálogo workspace",
             300, 30, 1370, 250, "s3", True),
     "dbx": ("Databricks (workspace propio del equipo · Free Edition, serverless)",
             300, 330, 1370, 400, "dbx", True),
@@ -48,13 +48,14 @@ NODOS = {
     "droplet": ("Droplet DigitalOcean · 159.65.111.14 · usuario sin sudo",
                 300, 790, 1370, 360, "droplet", True),
     # S3
-    "raw": ("FOTOS (Volume)\nequipo6_bronze.crudos/fotos/\n.HEIC con EXIF", 330, 85, 290, 150,
+    "raw": ("FOTOS (S3, solo lectura)\nxloc-raw: s3://cc3105-raw/img/\n110 .HEIC/.JPG con EXIF",
+            330, 85, 290, 150,
             "raw", False),
-    "bronce": ("BRONCE\nworkspace.equipo6_bronze\nfotos_precios · mem_referencia_raw",
+    "bronce": ("BRONCE\nworkspace.equipo_06_bronze\nfotos_precios · mem_referencia_raw",
                660, 85, 300, 150, "bronce", False),
-    "plata": ("PLATA\nworkspace.equipo6_silver\nprecios · precios_rejected · mem",
+    "plata": ("PLATA\nworkspace.equipo_06_silver\nprecios · precios_rejected · mem",
               1000, 85, 300, 150, "plata", False),
-    "oro": ("ORO\nworkspace.equipo6_gold\nprecio_semanal · variacion_semanal\n"
+    "oro": ("ORO\nworkspace.equipo_06_gold\nprecio_semanal · variacion_semanal\n"
             "features_modelo · predicciones\nmetricas_modelo", 1340, 85, 300, 165, "oro", False),
     # Databricks
     "t1": ("01_bronze\nbinaryFile / Auto Loader\nincremental · _ingestion_timestamp",

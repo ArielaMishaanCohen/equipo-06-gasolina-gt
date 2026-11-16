@@ -26,5 +26,5 @@ El video de respaldo de la demo (`demo_api_respaldo.mp4`, 87 s) no está en Git 
 | `12_job_programacion_alertas1.png` | Programación semanal: martes 07:00, America/Guatemala |
 | `12_job_programacion_alertas2.png` | Notificación por correo si el Job falla |
 | `13_mlflow_experimento.png` | Corridas de MLflow comparando modelos y línea base |
-| `14_tablas_oro.png` | Esquema `equipo6_gold` en Catalog con sus tablas |
-| `15_predicciones_oro.png` | Datos de `equipo6_gold.predicciones` |
+| `14_tablas_oro.png` | Esquema `equipo_06_gold` en Catalog con sus tablas |
+| `15_predicciones_oro.png` | Datos de `equipo_06_gold.predicciones` |
