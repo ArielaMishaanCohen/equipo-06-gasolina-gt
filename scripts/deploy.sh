@@ -88,8 +88,17 @@ if [ "$MODO" = docker ]; then
     docker compose build api || { echo "❌ No se pudo construir la imagen."; exit 1; }
   fi
 
+  # --- 5D. Si quedó una API en modo venv, se detiene: si no, el contenedor no toma el puerto ---
+  if [ -f api.pid ] && kill -0 "$(cat api.pid)" 2>/dev/null; then
+    paso "Deteniendo la API en modo venv (PID $(cat api.pid))"
+    kill "$(cat api.pid)"; sleep 2
+    kill -0 "$(cat api.pid)" 2>/dev/null && kill -9 "$(cat api.pid)"
+    rm -f api.pid
+  fi
+
   # --- 6D. Levantar (restart: unless-stopped => se levanta sola al encender el servidor) ---
   paso "docker compose up -d"
+  docker compose down >/dev/null 2>&1 || true
   docker compose up -d api || { echo "❌ docker compose up falló."; mostrar_log; exit 1; }
   docker compose ps
 else
@@ -126,7 +135,11 @@ else
     .venv/bin/python -m pip install -q -e ".[api]" || { echo "❌ pip install falló."; exit 1; }
   fi
 
-  # --- 6V. Detener la instancia anterior (api.pid) ---
+  # --- 6V. Detener la instancia anterior (contenedor de modo docker y api.pid) ---
+  if command -v docker >/dev/null && docker compose ps -q api 2>/dev/null | grep -q .; then
+    paso "Deteniendo el contenedor de modo docker"
+    docker compose down || true
+  fi
   if [ -f api.pid ] && kill -0 "$(cat api.pid)" 2>/dev/null; then
     paso "Deteniendo la API anterior (PID $(cat api.pid))"
     kill "$(cat api.pid)"; sleep 2
