@@ -77,3 +77,8 @@ La escritura en `xloc-cusn`, `xloc-ag` y `xloc-au` se probó el mismo día y Dat
 `PERMISSION_DENIED: User cannot write to a read-only external location`. Por eso las tablas siguen
 gestionadas. Respaldo del Job anterior: [`respaldo/job_antes_s3_20261116.json`](respaldo/job_antes_s3_20261116.json);
 `python scripts/dbx_job.py aplicar | revertir | correr`.
+
+**Job `equipo-06-pipeline` con la configuración nueva (Run now):**
+[26776677812770](https://dbc-f51e9943-f137.cloud.databricks.com/?o=1420684327351409#job/637916192930332/run/26776677812770),
+SUCCESS / SUCCESS / SUCCESS en 37 / 257 / 146 s. Segunda carga sobre los mismos esquemas: Bronce
+sigue en 110 filas (0 duplicados), Plata en 221 aceptadas y 26 rechazadas, `predicciones` en 3 filas.

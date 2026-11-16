@@ -67,8 +67,8 @@ main{max-width:1540px;margin:auto;padding:35px 42px 24px}.page-head{display:flex
 </div>
 <section class="panel flow-panel" id="como-funciona" aria-labelledby="flow-title"><div class="panel-head"><div><h2 id="flow-title">Cómo se construyen estos datos</h2><p class="sub">Arquitectura medallón en Databricks; la API solo lee la capa Oro</p></div><span class="pill">Job semanal · martes 07:00</span></div>
   <ol class="flow">
-    <li><span class="step">1 · Bronce</span><strong>Fotos de las bombas</strong><p>38 fotos HEIC de rótulos Shell y Puma (enero–noviembre 2026), guardadas tal como llegan con sus metadatos. Carga incremental, sin duplicados.</p></li>
-    <li><span class="step">2 · Plata</span><strong>Lectura con OCR</strong><p>RapidOCR extrae súper, regular y diésel. Revisión manual de 85 precios en 36 fotos: <b>91.8&nbsp;%</b> leídos correctamente. Lo dudoso va a cuarentena.</p></li>
+    <li><span class="step">1 · Bronce</span><strong>Fotos de las bombas</strong><p>110 fotos de rótulos Shell y Puma (2023 a noviembre 2026), leídas del bucket S3 del catedrático por una external location y guardadas tal como llegan con sus metadatos. Carga incremental, sin duplicados.</p></li>
+    <li><span class="step">2 · Plata</span><strong>Lectura con OCR</strong><p>RapidOCR extrae súper, regular y diésel. Revisión manual de 85 precios en 36 fotos: <b>91.8&nbsp;%</b> leídos correctamente. 221 precios aceptados; los dudosos van a cuarentena.</p></li>
     <li><span class="step">3 · Oro</span><strong>Indicadores y modelo</strong><p>Precio y variación semanal, variables con el histórico del MEM y el petróleo (FRED). Regresión logística comparada contra la línea base, registrada en MLflow.</p></li>
     <li><span class="step">4 · API</span><strong>Este panel</strong><p>FastAPI en el servidor del curso lee las tablas Oro por el SQL warehouse de Databricks. <span id="flow-health">Verificando conexión…</span></p></li>
   </ol>
